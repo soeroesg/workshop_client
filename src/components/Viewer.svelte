@@ -27,6 +27,10 @@
     import ArCloudOverlay from "./dom-overlays/ArCloudOverlay.svelte";
     import MarkerOverlay from "./dom-overlays/MarkerOverlay.svelte";
 
+    import {mat4, vec4, mat3, vec3, quat} from 'gl-matrix';
+    import LatLon from 'geodesy/latlon-ellipsoidal-vincenty.js';
+    
+    
     export let activeArMode;
 
 
@@ -131,7 +135,10 @@
                 requiredFeatures: ['dom-overlay', 'camera-access'],
                 callback: oscpModeCallback
             }
-            camera.camera.startXr(pc.XRTYPE_AR, pc.XRSPACE_LOCALFLOOR, options);
+            //camera.camera.startXr(pc.XRTYPE_AR, pc.XRSPACE_LOCALFLOOR, options);
+            // XRSPACE_UNBOUNDED -- PlayCanvas documentation says this is for untethered VR, and for AR we should use VIEWER
+            camera.camera.startXr(pc.XRTYPE_AR, pc.XRSPACE_UNBOUNDED, options);
+            //camera.camera.startXr(pc.XRTYPE_AR, pc.XRSPACE_VIEWER, options);
         } else if (activeArMode === ARMODES.marker) {
             options = {
                 requiredFeatures: ['image-tracking'],
@@ -284,6 +291,7 @@
         validateRequest(false);
 
         const start = Date.now();
+/*
         sendRequest(`${$availableContentServices[0].url}/${objectEndpoint}`, JSON.stringify(geoPoseRequest))
             .then(data => {
                 console.log('Duration', Date.now() - start);
@@ -304,8 +312,8 @@
 
                 console.error(error);
             });
+*/
 
-/*
         // Fake data for development
         {
             console.log('fake localisation');
@@ -313,27 +321,66 @@
             wait(1000).then(showFooter = false);
             placeContent(fakeLocationResult.geopose.pose, fakeLocationResult.scrs, pose)
         }
-*/
+
     }
+    
+
+     function convertGeoPose2PoseMat(globalPose) {
+        let globalPositionLatLon = new LatLon(globalPose.latitude, globalPose.longitude, globalPose.altitude);
+        let globalPositionCartesian = globalPositionLatLon.toCartesian();
+        let globalPositionVec3 = vec3.fromValues(globalPositionCartesian.x, globalPositionCartesian.y, globalPositionCartesian.z);
+        //console.log(globalPositionVec3);
+        let globalOrientationArray = globalPose.quaternion;
+        let globalOrientationQuat = quat.fromValues(globalOrientationArray[0], globalOrientationArray[1], globalOrientationArray[2], globalOrientationArray[3]);
+        //console.log(globalOrientationQuat);
+        let globalPoseMat4 = mat4.create();
+        mat4.fromRotationTranslation(globalPoseMat4, globalOrientationQuat, globalPositionVec3);
+        //console.log(globalPoseMat4);
+        return globalPoseMat4;
+     }
 
     /**
      *  Places the content provided by a call to a Spacial Content Discovery server.
      *
      * @param globalPose  GeoPose
-     * @param scr  SCR Spatial      Content Record with the result from the server request
-     * @param localPose XRPose      The pose of the device when localisation was started
+     * @param scr  SCR    Spatial Content Record with the result from the server request
+     * @param localPose XRPose    The pose of the device when localisation was started
      */
     function placeContent(globalPose, scr, localPose) {
-        console.log(localPose);
+        console.log('local image pose:');
+        let localImagePoseMat4 = localPose.transform.matrix;
+        console.log(localImagePoseMat4);
 
-        const localPosition = localPose.transform.position;
+        console.log('global image GeoPose:');
+        let globalImagePose = globalPose;
+        console.log(globalImagePose);
+        
+        console.log('global image pose:');
+        let globalImagePoseMat4 = convertGeoPose2PoseMat(globalPose);
+        console.log(globalImagePoseMat4);
+
+        console.log('global image pose inverse:');
+        let globalImagePoseInvMat4 = mat4.create();
+        mat4.invert(globalImagePoseInvMat4, globalImagePoseMat4);
+        console.log(globalImagePoseInvMat4);
+        
+
+        console.log("TEST inverse:");
+        let test = mat4.create();
+        mat4.multiply(test, globalImagePoseMat4, globalImagePoseInvMat4);
+        console.log(test); // this should be identity matrix - OK
+
 
         scr.forEach(record => {
+            console.log("=== SCR ===========")
             // This is difficult to generalize, because there are no types defined yet.
             if (record.content.type === 'placeholder') {
                 if ($availableContentServices[0].url.includes('augmented.city')) {
                     record.content.geopose.pose = flipLatLon(record.content.geopose.pose);
                 }
+                
+                /*
+                const localPosition = localPose.transform.position;
 
                 // Augmented City special path for the GeoPose. Should be just 'record.content.geopose'
                 const contentPosition = calculateLocalLocation(globalPose, record.content.geopose.pose);
@@ -343,10 +390,74 @@
                     contentPosition.y + localPosition.y,
                     contentPosition.z + localPosition.z);
                 // TODO: placeholder.setRotation(0, 0, 0);
-                app.root.addChild(placeholder);
-
-
                 console.log(contentPosition);
+                */
+
+                //NOTE: what is the LatLon library's Cartesian coordinate system?
+                // Do we need to change axes here?
+
+
+                //NOTE: WebXR coordinate system: 
+                // X to the right
+                // Y to up
+                // Z outwards from the screen
+
+                
+
+                console.log("global object GeoPose:");
+                let globalObjectPose = record.content.geopose.pose;
+                console.log(globalObjectPose);
+
+                console.log("global object pose:");
+                let globalObjectPoseMat4 = convertGeoPose2PoseMat(globalObjectPose);
+                console.log(globalObjectPoseMat4);
+
+
+                // NOTE: gl-matrix has weird notation order for operations
+                // if you want output = matrixB * matrixA, 
+                // then you need to write mat.multiply(output, matrixA, matrixB);
+
+                // NOTE:
+                //Tcam2model = Tgeo2model *  Tpic2geo * Tcam2pic
+                //Tcam2model = Tgeo2model *  inv(Tgeo2pic) * Tcam2pic
+                //conceptually it should read the other way round: Tcam2model = Tcam2pic * Tpic2geo * Tgeo2model 
+                
+                
+                console.log("temp0:");
+                let temp0 = mat4.create();
+                console.log(temp0);
+
+                console.log("temp1:");
+                let temp1 = mat4.create();
+                mat4.multiply(temp1, temp0, globalObjectPoseMat4);
+                console.log(temp1);
+
+                console.log("temp2:");
+                let temp2 = mat4.create();
+                mat4.multiply(temp2, temp1, globalImagePoseInvMat4);
+                console.log(temp2);
+
+                console.log("temp3:");
+                let temp3 = mat4.create();
+                mat4.multiply(temp3, temp2, localImagePoseMat4);
+                console.log(temp3);
+
+                console.log("local object pose:");
+                let localObjectPoseMat4 = temp3;
+                console.log(localObjectPoseMat4);
+
+                let q = quat.create(); mat4.getRotation(q, localObjectPoseMat4);
+                let t = vec3.create(); mat4.getTranslation(t, localObjectPoseMat4);
+                let s = vec3.create(); mat4.getScaling(s, localObjectPoseMat4); // this should be all 1s - OK
+                
+
+                const placeholder = createPlaceholder(record.content.keywords);
+                //placeholder.setLocalRotation(q);
+                //placeholder.setLocalPosition(t);
+                //console.log("object's local transform:");
+                //console.log(placeholder.getLocalTransform());
+
+                app.root.addChild(placeholder);
             }
         })
     }
