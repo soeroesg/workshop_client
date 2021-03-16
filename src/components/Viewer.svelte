@@ -339,6 +339,31 @@
         return globalPoseMat4;
      }
 
+    function getRelativePosition(cameraGeoPose, objectGeoPose) {
+        
+
+        // first method
+        // problem: cannot handle altitude differences, because distanceTo method only works on the surface of the ellipse
+        const cam = new LatLon(cameraGeoPose.latitude, cameraGeoPose.longitude/*, cameraGeoPose.altitude*/);
+        const cam2objLat = new LatLon(objectGeoPose.latitude, cameraGeoPose.longitude/*, cameraGeoPose.altitude*/);
+        const cam2objLon = new LatLon(cameraGeoPose.latitude, objectGeoPose.longitude/*, cameraGeoPose.altitude*/);
+        //const cam2objAlt = new LatLon(cameraGeoPose.latitude, cameraGeoPose.longitude/*, objectGeoPose.altitude*/);
+        const dx = cam.distanceTo(cam2objLon);
+        const dy = cam.distanceTo(cam2objLat);
+        //const dz = cam.distanceTo(cam2objAlt);
+        console.log("dx: " + dx + ", dy: " + dy/* + ", dz: " + dz*/);
+        
+        // second method
+        const cameraPosition = new LatLon(cameraGeoPose.latitude, cameraGeoPose.longitude, cameraGeoPose.altitude);
+        const objectPosition = new LatLon(objectGeoPose.latitude, objectGeoPose.longitude, objectGeoPose.altitude);
+        const diff = objectPosition.toCartesian().minus(cameraPosition.toCartesian());
+        
+        console.log("diff.x: " + diff.x + ", diff.y: " + diff.y + ", diff.z: " + diff.z);
+
+        // TODO: Add y-value when receiving valid height value from GeoPose service
+        return vec3.fromValues(dx*0.01, 0.0, -dy*0.01); // WARNING: change of coordinate axes!! Specific to AugmentedCity???
+    }
+
     /**
      *  Places the content provided by a call to a Spacial Content Discovery server.
      *
@@ -456,9 +481,25 @@
                 let s = vec3.create(); mat4.getScaling(s, localObjectPoseMat4); // this should be all 1s - OK
                 
 
+
+
+                /// NEW
+                let localCameraPosition = vec3.create();
+                mat4.getTranslation(localCameraPosition, localImagePoseMat4);
+                let relativePosition = getRelativePosition(globalImagePose, globalObjectPose);
+                
+                //let localObjectPosition = vec3.create();
+                //vec3.add(localObjectPosition, localCameraPosition, relativePosition);
+                let localObjectPosition = relativePosition; // DEBUG: displace from origin instead of from camera
+                ///
+
+
+
                 const placeholder = createPlaceholder(record.content.keywords);
                 //placeholder.setLocalRotation(q);
                 //placeholder.setLocalPosition(t);
+                //placeholder.setPosition(localObjectPosition);
+                placeholder.translate(localObjectPosition);
                 //console.log("object's local transform:");
                 //console.log(placeholder.getLocalTransform());
 
