@@ -20,7 +20,7 @@
     import { initialLocation, availableContentServices, currentMarkerImage,
         currentMarkerImageWidth, selectedGeoPoseService } from '@src/stateStore';
     import { createImageFromTexture, wait, ARMODES } from "@core/common";
-    import { createModel, createPlaceholder } from '@core/modelTemplates';
+    import { createModel, createPlaceholder, createObject } from '@core/modelTemplates';
     import { calculateLocalLocation, fakeLocationResult } from '@core/locationTools';
 
     import { initializeGLCube, drawScene } from '@core/texture';
@@ -396,6 +396,11 @@
                 //NOTE: what is the LatLon library's Cartesian coordinate system?
                 // Do we need to change axes here?
 
+                // NOTE: from the oscp-demo-client.py (Augmented City)
+                // Spatial Content Record GeoPose represents object's frame (Z up, X forward direction) in ECEF coordinate system,
+                // so that it is correctly oriented with respect to North direction and vertical axis and placed about WGS84
+                // ellipsoid level.
+
 
                 //NOTE: WebXR coordinate system: 
                 // X to the right
@@ -460,6 +465,29 @@
                 app.root.addChild(placeholder);
             }
         })
+
+
+        // DEBUG: add something small at the positive X, Y, Z:
+        const objX = createObject("box", new pc.Color(1,0,0));
+        objX.setPosition(1,0,0);
+        app.root.addChild(objX);
+        const objY = createObject("sphere", new pc.Color(0,1,0));
+        objY.setPosition(0,1,0);
+        app.root.addChild(objY);
+        const objZ = createObject("cone", new pc.Color(0,0, 1));
+        objZ.setPosition(0,0,1);
+        app.root.addChild(objZ);
+
+        /*
+        const light = createLight();
+        app.root.addChild(light);
+
+        let logo = new pc.Entity('logo');
+        //logo.setPosition(0,0,0);
+        app.root.addChild(logo);
+        */
+
+        app.scene.ambientLight = new pc.Color(0.8, 0.8, 0.8);
     }
 
 
