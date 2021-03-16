@@ -9,7 +9,9 @@
 <script>
     import { createEventDispatcher } from 'svelte';
 
+    
     import '@thirdparty/playcanvas.min.js';
+    import '@thirdparty/playcanvas-gltf';
     import {v4 as uuidv4} from 'uuid';
 
     import { sendRequest, objectEndpoint, validateRequest } from 'gpp-access';
@@ -20,7 +22,7 @@
     import { initialLocation, availableContentServices, currentMarkerImage,
         currentMarkerImageWidth, selectedGeoPoseService } from '@src/stateStore';
     import { createImageFromTexture, wait, ARMODES } from "@core/common";
-    import { createModel, createPlaceholder, createObject } from '@core/modelTemplates';
+    import { createModel, createPlaceholder, createObject, createLight } from '@core/modelTemplates';
     import { calculateLocalLocation, fakeLocationResult } from '@core/locationTools';
 
     import { initializeGLCube, drawScene } from '@core/texture';
@@ -519,14 +521,16 @@
         objZ.setPosition(0,0,1);
         app.root.addChild(objZ);
 
-        /*
+        
         const light = createLight();
         app.root.addChild(light);
 
         let logo = new pc.Entity('logo');
+        logo.setLocalScale(0.1, 0.1, 0.1);
         //logo.setPosition(0,0,0);
         app.root.addChild(logo);
-        */
+        loadLogo(); // async
+        
 
         app.scene.ambientLight = new pc.Color(0.8, 0.8, 0.8);
     }
@@ -542,6 +546,36 @@
 
         return pose;
     }
+
+    
+    function loadLogo() {
+        app.assets.loadFromUrl('assets/oarc/logo.glb', 'binary', function (err, asset) {
+            console.log(err);
+            if (asset === undefined) {
+                return;
+            }
+            var glb = asset.resource;
+            loadGlb(glb, app.graphicsDevice, function (err, res) {
+                // Wrap the model as an asset and add to the asset registry
+                var asset = new pc.Asset('gltf', 'model', {
+                    url: ''
+                });
+                asset.resource = res.model;
+                asset.loaded = true;
+                app.assets.add(asset);
+
+                // Add the loaded scene to the hierarchy
+                var gltf = new pc.Entity('gltf');
+                gltf.addComponent('model', {
+                    asset: asset
+                });
+                
+                app.root.findByName("logo").addChild(gltf)
+            });
+        });
+    }
+    
+
 </script>
 
 

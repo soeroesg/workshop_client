@@ -42,7 +42,7 @@ export function createModel() {
  * A directional light.
  * @returns {Entity}
  */
-function createLight() {
+export function createLight() {
     // Add a pc.LightComponent to an entity
     let entity = new pc.Entity();
     entity.addComponent('light', {
