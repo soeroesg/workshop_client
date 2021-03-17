@@ -11,7 +11,6 @@
 
     
     import '@thirdparty/playcanvas.min.js';
-    import '@thirdparty/playcanvas-gltf';
     import {v4 as uuidv4} from 'uuid';
 
     import { sendRequest, objectEndpoint, validateRequest } from 'gpp-access';
@@ -22,7 +21,7 @@
     import { initialLocation, availableContentServices, currentMarkerImage,
         currentMarkerImageWidth, selectedGeoPoseService } from '@src/stateStore';
     import { createImageFromTexture, wait, ARMODES } from "@core/common";
-    import { createModel, createPlaceholder, createObject, createLight } from '@core/modelTemplates';
+    import { createModel, createPlaceholder, createObject, addLight, addLogo, addAxes } from '@core/modelTemplates';
     import { calculateLocalLocation, fakeLocationResult } from '@core/locationTools';
 
     import { initializeGLCube, drawScene } from '@core/texture';
@@ -345,7 +344,7 @@
         mat4.fromRotationTranslation(globalPoseMat4, globalOrientationQuat, globalPositionVec3);
         //console.log(globalPoseMat4);
         return globalPoseMat4;
-     }
+    }
 
     /**
     *  Calculates the relative position of two geodesic locations.
@@ -559,31 +558,14 @@
                 app.root.addChild(placeholder);
             }
         })
+      
 
+        addLight(app);
 
-        // DEBUG: add something small at the positive X, Y, Z:
-        const objX = createObject("box", new pc.Color(1,0,0));
-        objX.setPosition(1,0,0);
-        app.root.addChild(objX);
-        const objY = createObject("sphere", new pc.Color(0,1,0));
-        objY.setPosition(0,1,0);
-        app.root.addChild(objY);
-        const objZ = createObject("cone", new pc.Color(0,0, 1));
-        objZ.setPosition(0,0,1);
-        app.root.addChild(objZ);
+        addAxes(app);
 
-        
-        const light = createLight();
-        app.root.addChild(light);
+        addLogo(app); // async
 
-        let logo = new pc.Entity('logo');
-        logo.setLocalScale(0.1, 0.1, 0.1);
-        //logo.setPosition(0,0,0);
-        app.root.addChild(logo);
-        loadLogo(); // async
-        
-
-        
     }
 
 
@@ -599,32 +581,7 @@
     }
 
     
-    function loadLogo() {
-        app.assets.loadFromUrl('assets/oarc/logo.glb', 'binary', function (err, asset) {
-            console.log(err);
-            if (asset === undefined) {
-                return;
-            }
-            var glb = asset.resource;
-            loadGlb(glb, app.graphicsDevice, function (err, res) {
-                // Wrap the model as an asset and add to the asset registry
-                var asset = new pc.Asset('gltf', 'model', {
-                    url: ''
-                });
-                asset.resource = res.model;
-                asset.loaded = true;
-                app.assets.add(asset);
-
-                // Add the loaded scene to the hierarchy
-                var gltf = new pc.Entity('gltf');
-                gltf.addComponent('model', {
-                    asset: asset
-                });
-                
-                app.root.findByName("logo").addChild(gltf)
-            });
-        });
-    }
+    
     
 
 </script>

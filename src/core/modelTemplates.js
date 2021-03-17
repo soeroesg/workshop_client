@@ -30,27 +30,26 @@ export function createModel() {
  export function createObject(type, color) {
     let entity = new pc.Entity();
     entity.addComponent("model", {type: type});
+    /*
+    let mesh = pc.createBox(app.graphicsDevice);
+    let material = new pc.StandardMaterial();
+    let node = new pc.GraphNode();
+    let meshInstance = new pc.MeshInstance(mesh, material, node);
+    entity.model.meshInstances = [meshInstance];
+    material.ambient.set(color);
+    material.diffuse.set(color);
+    material.emissive.set(color);
+    material.specular.set(color);
+    material.fresnelModel = pc.FRESNEL_NONE;
+    material.shadingModel = pc.SPECULAR_PHONG;
+    material.update();
+    entity.model.material = material
+    */
     entity.setLocalScale(0.1, 0.1, 0.1);
-    //entity.model.material = new pc.StandardMaterial();
-    //entity.model.material.diffuse.set(color);
-    //entity.model.material.specular.set(1, 1, 1);
-    //entity.model.material.update();
     return entity;
 }
 
-/**
- * A directional light.
- * @returns {Entity}
- */
-export function createLight() {
-    // Add a pc.LightComponent to an entity
-    let entity = new pc.Entity();
-    entity.addComponent('light', {
-        type: "directional", // directional, point, spot
-        color: new pc.Color(1, 1, 1)
-    });
-    return entity;
-}
+
 
 
 
@@ -67,4 +66,63 @@ export function createPlaceholder(keywords) {
     placeholder.addComponent('model', {type: 'box'});
     placeholder.setLocalScale(0.1, 0.2, 0.3);
     return placeholder;
+}
+
+export function addAxes(app) {
+    // DEBUG: add something small at the positive X, Y, Z:
+    const objX = createObject("box", new pc.Color(1, 0, 0));
+    objX.setPosition(1, 0, 0);
+    app.root.addChild(objX);
+    const objY = createObject("sphere", new pc.Color(0, 1, 0));
+    objY.setPosition(0, 1, 0);
+    app.root.addChild(objY);
+    const objZ = createObject("cone", new pc.Color(0, 0, 1));
+    objZ.setPosition(0, 0, 1);
+    app.root.addChild(objZ);
+}
+
+export function addLogo(app) {
+
+  // Load a model file and create a Entity with a model component
+  var url = "assets/oarc/logo.glb";
+  app.assets.loadFromUrl(url, "container", function (err, asset) {
+       if (err != null) {
+          console.log(err);
+      }
+      if (asset === undefined) {
+          return;
+      }
+      
+
+      let logo = new pc.Entity('logo');
+      logo.setLocalScale(0.1, 0.1, 0.1); // an extra scaling
+      logo.setPosition(0,0,0);
+      app.root.addChild(logo);
+
+      var entity = new pc.Entity();
+      entity.addComponent("model", {
+          type: "asset",
+          asset: asset.resource.model,
+          castShadows: true
+      });
+      app.root.findByName("logo").addChild(entity)
+      //app.root.addChild(entity);
+  });
+}
+
+/**
+* A directional light.
+* @returns {Entity}
+*/
+export function addLight(app) {
+    // Add a pc.LightComponent to an entity
+    let entity = new pc.Entity();
+    entity.addComponent('light', {
+        type: "directional", // directional, point, spot
+        color: new pc.Color(1, 1, 1)
+    });
+
+    app.root.addChild(entity);
+
+    return entity;
 }
