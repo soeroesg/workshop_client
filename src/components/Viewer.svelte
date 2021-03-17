@@ -125,6 +125,14 @@
         light.translate(0, 10, 0);
         app.root.addChild(light);
 
+
+        addLight(app);
+
+        addAxes(app);
+
+        //addLogo(app); // async
+
+
         return camera;
     }
 
@@ -197,7 +205,8 @@
         // cameraShader = initializeGLCube(gl);
 
         app.xr.session.updateRenderState({baseLayer: new XRWebGLLayer(app.xr.session, gl)});
-        app.xr.session.requestReferenceSpace('local').then((refSpace) => {
+        //app.xr.session.requestReferenceSpace('local').then((refSpace) => {
+            app.xr.session.requestReferenceSpace('unbounded').then((refSpace) => {
             xrRefSpace = refSpace;
         });
     }
@@ -533,7 +542,11 @@
                 let s = vec3.create(); mat4.getScaling(s, localObjectPoseMat4); // this should be all 1s - OK
                 
 
+                //////////////////
 
+                const placeholder = createPlaceholder(record.content.keywords);
+                
+                //placeObject(placeholder, localImagePoseMat4, globalObjectPose, globalImagePose);
 
 
                 let relativePosition = getRelativeGlobalPosition(globalImagePose, globalObjectPose);
@@ -557,7 +570,6 @@
                 quat.multiply(localObjectOrientation, relativeOrientation, localCameraOrientation);
                 
 
-                const placeholder = createPlaceholder(record.content.keywords);
                 console.log("localObjectPosition:");
                 console.log(localObjectPosition);
                 console.log("localObjectOrientation:");
@@ -567,8 +579,8 @@
                 t = localObjectPosition;
                 //placeholder.setLocalRotation(q);
                 //placeholder.setLocalPosition(t);
-                placeholder.setPosition(localObjectPosition.x, localObjectPosition.y, localObjectPosition.z); // from vec3 to Vec3
-           //     placeholder.setRotation(localObjectOrientation.x, localObjectOrientation.y, localObjectOrientation.z, localObjectOrientation.w); // from quat to Quat
+                placeholder.setPosition(localObjectPosition[0], localObjectPosition[1], localObjectPosition[2]); // from vec3 to Vec3
+                placeholder.setRotation(localObjectOrientation[0], localObjectOrientation[1], localObjectOrientation[2], localObjectOrientation[3]); // from quat to Quat
                 //placeholder.translate(localObjectPosition);
                 //console.log("object's local transform:");
                 //console.log(placeholder.getLocalTransform());
@@ -576,13 +588,6 @@
                 app.root.addChild(placeholder);
             }
         })
-      
-
-        addLight(app);
-
-        addAxes(app);
-
-        addLogo(app); // async
 
     }
 

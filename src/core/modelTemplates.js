@@ -69,6 +69,7 @@ export function createPlaceholder(keywords) {
 }
 
 export function addAxes(app) {
+
     // DEBUG: add something small at the positive X, Y, Z:
     const objX = createObject("box", new pc.Color(1, 0, 0));
     objX.setPosition(1, 0, 0);
@@ -79,6 +80,11 @@ export function addAxes(app) {
     const objZ = createObject("cone", new pc.Color(0, 0, 1));
     objZ.setPosition(0, 0, 1);
     app.root.addChild(objZ);
+
+    let obj0 = createObject("box", new pc.Color(1, 0, 0));
+    obj0.setLocalScale(0.01, 0.01, 0.01);
+    obj0.setPosition(0, 0, 0);
+    app.root.addChild(obj0);
 }
 
 export function addLogo(app) {
