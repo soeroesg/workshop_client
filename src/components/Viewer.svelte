@@ -108,6 +108,7 @@
         const camera = new pc.Entity();
         camera.addComponent('camera', {
             clearColor: new pc.Color(0, 0, 0, 0),
+            nearClip: 0.001,
             farClip: 10000
         });
         app.root.addChild(camera);
@@ -323,17 +324,17 @@
         {
             console.log('fake localisation');
             isLocalized = true;
-            wait(1000).then(fakeLocationResult => {
-                showFooter = false;
-                placeContent(fakeLocationResult.geopose.pose, fakeLocationResult.scrs, pose);
-            });
+            wait(1000).then(showFooter = false);
+            placeContent(fakeLocationResult.geopose.pose, fakeLocationResult.scrs, pose);
         }
 
     }
     
+    function convertGeoPose2PoseMat(globalPose) {
+        // WARNING: AugmentedCity returns incorrect altitude! So we assume here that we are on the Earth surface.
+        //let globalPositionLatLon = new LatLon(globalPose.latitude, globalPose.longitude, globalPose.altitude);
+        let globalPositionLatLon = new LatLon(globalPose.latitude, globalPose.longitude);
 
-     function convertGeoPose2PoseMat(globalPose) {
-        let globalPositionLatLon = new LatLon(globalPose.latitude, globalPose.longitude, globalPose.altitude);
         let globalPositionCartesian = globalPositionLatLon.toCartesian();
         let globalPositionVec3 = vec3.fromValues(globalPositionCartesian.x, globalPositionCartesian.y, globalPositionCartesian.z);
         //console.log(globalPositionVec3);
@@ -356,25 +357,28 @@
     * @param objectGeoPose  GeoPose of an object
     * @returns vec3         Relative position of the object with respect to the camera
     */ 
-    function getRelativePosition(cameraGeoPose, objectGeoPose) {
-        // first method
+    function getRelativeGlobalPosition(cameraGeoPose, objectGeoPose) {
+        // first method, Geo
         const cam = new LatLon(cameraGeoPose.latitude, cameraGeoPose.longitude);
         const cam2objLat = new LatLon(objectGeoPose.latitude, cameraGeoPose.longitude);
         const cam2objLon = new LatLon(cameraGeoPose.latitude, objectGeoPose.longitude);
         const dx = cam.distanceTo(cam2objLon);
         const dy = cam.distanceTo(cam2objLat);
-        const dz = objectGeoPose.altitude - cameraGeoPose.altitude; // WARNING: AugmentedCity return invalid height
+        const dz = objectGeoPose.altitude - cameraGeoPose.altitude; // WARNING: AugmentedCity returns invalid height!
         console.log("dx: " + dx + ", dy: " + dy + ", dz: " + dz);
         
-        // second method
-        const cameraPosition = new LatLon(cameraGeoPose.latitude, cameraGeoPose.longitude, cameraGeoPose.altitude);
-        const objectPosition = new LatLon(objectGeoPose.latitude, objectGeoPose.longitude, objectGeoPose.altitude);
-        const diff = objectPosition.toCartesian().minus(cameraPosition.toCartesian());        
+
+        // TODO: REMOVE, this is wrong!
+        // second method, ECEF
+        // WARNING: AugmentedCity returns invalid height!
+        const cameraPosition = new LatLon(cameraGeoPose.latitude, cameraGeoPose.longitude/*, cameraGeoPose.altitude*/);
+        const objectPosition = new LatLon(objectGeoPose.latitude, objectGeoPose.longitude/*, objectGeoPose.altitude*/);
+        const diff = objectPosition.toCartesian().minus(cameraPosition.toCartesian());
         console.log("diff.x: " + diff.x + ", diff.y: " + diff.y + ", diff.z: " + diff.z);
 
         // TODO: Add y-value when receiving valid height value from GeoPose service
         // WARNING: change of coordinate axes to match WebGL coordinate system
-        return vec3.fromValues(dx, 0.0, -dy); 
+        return vec3.fromValues(dx, 0.0, -dy);
     }
 
     /**
@@ -387,13 +391,13 @@
     * @param objectGeoPose  GeoPose of an object
     * @returns quat         Relative orientation of the object with respect to the camera
     */ 
-    function getRelativeOrientation(cameraGeoPose, objectGeoPose) {
+    function getRelativeGlobalOrientation(cameraGeoPose, objectGeoPose) {
         // camera orientation
         const qCam = quat.fromValues(
-                globalPose.quaternion[0],
-                globalPose.quaternion[1],
-                globalPose.quaternion[2],
-                globalPose.quaternion[3]);
+                cameraGeoPose.quaternion[0],
+                cameraGeoPose.quaternion[1],
+                cameraGeoPose.quaternion[2],
+                cameraGeoPose.quaternion[3]);
         // object orientation
         const qObj = quat.fromValues(
                 objectGeoPose.quaternion[0],
@@ -531,27 +535,41 @@
 
 
 
-                /// NEW
+
+                let relativePosition = getRelativeGlobalPosition(globalImagePose, globalObjectPose);
+                let relativeOrientation = getRelativeGlobalOrientation(globalImagePose, globalObjectPose);
+                console.log("relativePosition:");
+                console.log(relativePosition);
+                console.log("relativeOrientation:");
+                console.log(relativeOrientation);
+                // TODO: The global coordinate system is right handed with Z up. 
+                // now change to WebGL coordinate system (right handed, Y up)
+                //...
+
                 let localCameraPosition = vec3.create();
                 mat4.getTranslation(localCameraPosition, localImagePoseMat4);
-
-                let relativePosition = getRelativePosition(globalImagePose, globalObjectPose);
-                let relativeOrientation = getRelativeOrientation(globalImagePose, globalObjectPose);
-
+                let localObjectPosition = vec3.create();
+                vec3.add(localObjectPosition, localCameraPosition, relativePosition);
                 
-                //let localObjectPosition = vec3.create();
-                //vec3.add(localObjectPosition, localCameraPosition, relativePosition);
-                let localObjectPosition = relativePosition; // DEBUG: displace from origin instead of from camera
-                ///
-
-                quat.fromValues(localQuaternion.x, localQuaternion.y, localQuaternion.z, localQuaternion.w);
+                let localCameraOrientation = quat.create();
+                mat4.getRotation(localCameraOrientation, localImagePoseMat4);
+                let localObjectOrientation = quat.create();
+                quat.multiply(localObjectOrientation, relativeOrientation, localCameraOrientation);
                 
 
                 const placeholder = createPlaceholder(record.content.keywords);
+                console.log("localObjectPosition:");
+                console.log(localObjectPosition);
+                console.log("localObjectOrientation:");
+                console.log(localObjectOrientation);
+                
+                q = localObjectOrientation;
+                t = localObjectPosition;
                 //placeholder.setLocalRotation(q);
                 //placeholder.setLocalPosition(t);
-                //placeholder.setPosition(localObjectPosition);
-                placeholder.translate(localObjectPosition);
+                placeholder.setPosition(localObjectPosition.x, localObjectPosition.y, localObjectPosition.z); // from vec3 to Vec3
+           //     placeholder.setRotation(localObjectOrientation.x, localObjectOrientation.y, localObjectOrientation.z, localObjectOrientation.w); // from quat to Quat
+                //placeholder.translate(localObjectPosition);
                 //console.log("object's local transform:");
                 //console.log(placeholder.getLocalTransform());
 
