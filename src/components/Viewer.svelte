@@ -105,7 +105,7 @@
      * Set up the 3D environment as required according to the current real environment.*
      */
     function setupEnvironment() {
-        // create camera
+        // add camera
         const camera = new pc.Entity();
         camera.addComponent('camera', {
             clearColor: new pc.Color(0, 0, 0, 0),
@@ -113,6 +113,10 @@
         });
         app.root.addChild(camera);
 
+        // add ambient light
+        app.scene.ambientLight = new pc.Color(0.8, 0.8, 0.8);
+
+        // add spotlight
         const light = new pc.Entity();
         light.addComponent("light", {
             type: "spot",
@@ -320,8 +324,10 @@
         {
             console.log('fake localisation');
             isLocalized = true;
-            wait(1000).then(showFooter = false);
-            placeContent(fakeLocationResult.geopose.pose, fakeLocationResult.scrs, pose)
+            wait(1000).then(fakeLocationResult => {
+                showFooter = false;
+                placeContent(fakeLocationResult.geopose.pose, fakeLocationResult.scrs, pose);
+            });
         }
 
     }
@@ -341,29 +347,70 @@
         return globalPoseMat4;
      }
 
+    /**
+    *  Calculates the relative position of two geodesic locations.
+    *
+    *  Used to calculate the relative distance between the device at the moment of localization and the
+    *  location of an object received from a content discovery service.
+    *
+    * @param cameraGeoPose  GeoPose of the camera returned by the localization service
+    * @param objectGeoPose  GeoPose of an object
+    * @returns vec3         Relative position of the object with respect to the camera
+    */ 
     function getRelativePosition(cameraGeoPose, objectGeoPose) {
-        
-
         // first method
-        // problem: cannot handle altitude differences, because distanceTo method only works on the surface of the ellipse
-        const cam = new LatLon(cameraGeoPose.latitude, cameraGeoPose.longitude/*, cameraGeoPose.altitude*/);
-        const cam2objLat = new LatLon(objectGeoPose.latitude, cameraGeoPose.longitude/*, cameraGeoPose.altitude*/);
-        const cam2objLon = new LatLon(cameraGeoPose.latitude, objectGeoPose.longitude/*, cameraGeoPose.altitude*/);
-        //const cam2objAlt = new LatLon(cameraGeoPose.latitude, cameraGeoPose.longitude/*, objectGeoPose.altitude*/);
+        const cam = new LatLon(cameraGeoPose.latitude, cameraGeoPose.longitude);
+        const cam2objLat = new LatLon(objectGeoPose.latitude, cameraGeoPose.longitude);
+        const cam2objLon = new LatLon(cameraGeoPose.latitude, objectGeoPose.longitude);
         const dx = cam.distanceTo(cam2objLon);
         const dy = cam.distanceTo(cam2objLat);
-        //const dz = cam.distanceTo(cam2objAlt);
-        console.log("dx: " + dx + ", dy: " + dy/* + ", dz: " + dz*/);
+        const dz = objectGeoPose.altitude - cameraGeoPose.altitude; // WARNING: AugmentedCity return invalid height
+        console.log("dx: " + dx + ", dy: " + dy + ", dz: " + dz);
         
         // second method
         const cameraPosition = new LatLon(cameraGeoPose.latitude, cameraGeoPose.longitude, cameraGeoPose.altitude);
         const objectPosition = new LatLon(objectGeoPose.latitude, objectGeoPose.longitude, objectGeoPose.altitude);
-        const diff = objectPosition.toCartesian().minus(cameraPosition.toCartesian());
-        
+        const diff = objectPosition.toCartesian().minus(cameraPosition.toCartesian());        
         console.log("diff.x: " + diff.x + ", diff.y: " + diff.y + ", diff.z: " + diff.z);
 
         // TODO: Add y-value when receiving valid height value from GeoPose service
-        return vec3.fromValues(dx*0.01, 0.0, -dy*0.01); // WARNING: change of coordinate axes!! Specific to AugmentedCity???
+        // WARNING: change of coordinate axes to match WebGL coordinate system
+        return vec3.fromValues(dx, 0.0, -dy); 
+    }
+
+    /**
+    *  Calculates the relative orientation of two geodesic locations.
+    *
+    *  Used to calculate the relative orientation between the device at the moment of localization and the
+    *  location of an object received from a content discovery service.
+    *
+    * @param cameraGeoPose  GeoPose of the camera returned by the localization service
+    * @param objectGeoPose  GeoPose of an object
+    * @returns quat         Relative orientation of the object with respect to the camera
+    */ 
+    function getRelativeOrientation(cameraGeoPose, objectGeoPose) {
+        // camera orientation
+        const qCam = quat.fromValues(
+                globalPose.quaternion[0],
+                globalPose.quaternion[1],
+                globalPose.quaternion[2],
+                globalPose.quaternion[3]);
+        // object orientation
+        const qObj = quat.fromValues(
+                objectGeoPose.quaternion[0],
+                objectGeoPose.quaternion[1],
+                objectGeoPose.quaternion[2],
+                objectGeoPose.quaternion[3]);
+        // NOTE: if q2 = qdiff * q1, then  qdiff = q2 * inverse(q1)
+        let qCamInv = quat.create();
+        quat.invert(qCamInv, qCam); 
+        let qRel = quat.create();
+        quat.multiply(qRel, qObj, qCamInv);
+        return qRel;
+    }
+
+    function getObjectPosition(){
+        
     }
 
     /**
@@ -488,14 +535,18 @@
                 /// NEW
                 let localCameraPosition = vec3.create();
                 mat4.getTranslation(localCameraPosition, localImagePoseMat4);
+
                 let relativePosition = getRelativePosition(globalImagePose, globalObjectPose);
+                let relativeOrientation = getRelativeOrientation(globalImagePose, globalObjectPose);
+
                 
                 //let localObjectPosition = vec3.create();
                 //vec3.add(localObjectPosition, localCameraPosition, relativePosition);
                 let localObjectPosition = relativePosition; // DEBUG: displace from origin instead of from camera
                 ///
 
-
+                quat.fromValues(localQuaternion.x, localQuaternion.y, localQuaternion.z, localQuaternion.w);
+                
 
                 const placeholder = createPlaceholder(record.content.keywords);
                 //placeholder.setLocalRotation(q);
@@ -532,7 +583,7 @@
         loadLogo(); // async
         
 
-        app.scene.ambientLight = new pc.Color(0.8, 0.8, 0.8);
+        
     }
 
 
