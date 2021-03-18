@@ -298,6 +298,7 @@
      * @param height  Number    Height of the camera image
      */
     function localize(pose, image, width, height) {
+
         const geoPoseRequest = new GeoPoseRequest(uuidv4())
             .addCameraData(IMAGEFORMAT.JPG, [width, height], image.split(',')[1], 0, new ImageOrientation(false, 0))
             .addLocationData($initialLocation.lat, $initialLocation.lon, 0, 0, 0, 0, 0);
@@ -339,6 +340,13 @@
 
     }
     
+    // TODO: 
+    //DEBUG:load image from test file
+    //function loadDefaultPhoto() {
+    //    "media/IMG_20210317_095716_hdr.jpg"
+    //}
+
+
     function convertGeoPose2PoseMat(globalPose) {
         // WARNING: AugmentedCity returns incorrect altitude! So we assume here that we are on the Earth surface.
         //let globalPositionLatLon = new LatLon(globalPose.latitude, globalPose.longitude, globalPose.altitude);
@@ -373,9 +381,13 @@
         const cam2objLon = new LatLon(cameraGeoPose.latitude, objectGeoPose.longitude);
         const dx = cam.distanceTo(cam2objLon);
         const dy = cam.distanceTo(cam2objLat);
-        const dz = objectGeoPose.altitude - cameraGeoPose.altitude; // WARNING: AugmentedCity returns invalid height!
+        let dz = objectGeoPose.altitude - cameraGeoPose.altitude; 
         console.log("dx: " + dx + ", dy: " + dy + ", dz: " + dz);
-        
+
+        // TODO: Add y-value when receiving valid height value from GeoPose service
+        // WARNING: AugmentedCity returns invalid height!
+        // Therefore we set the dz=0
+        //dz = 0.0;
 
         // TODO: REMOVE, this is wrong!
         // second method, ECEF
@@ -385,9 +397,9 @@
         const diff = objectPosition.toCartesian().minus(cameraPosition.toCartesian());
         console.log("diff.x: " + diff.x + ", diff.y: " + diff.y + ", diff.z: " + diff.z);
 
-        // TODO: Add y-value when receiving valid height value from GeoPose service
+        
         // WARNING: change of coordinate axes to match WebGL coordinate system
-        return vec3.fromValues(dx, 0.0, -dy);
+        return vec3.fromValues(dx, dz, -dy);
     }
 
     /**
@@ -413,17 +425,23 @@
                 objectGeoPose.quaternion[1],
                 objectGeoPose.quaternion[2],
                 objectGeoPose.quaternion[3]);
+
         // NOTE: if q2 = qdiff * q1, then  qdiff = q2 * inverse(q1)
         let qCamInv = quat.create();
         quat.invert(qCamInv, qCam); 
         let qRel = quat.create();
         quat.multiply(qRel, qObj, qCamInv);
-        return qRel;
+
+        // WARNING: change of coordinate axes to match WebGL coordinate system
+        //return qRel; 
+        //TODO:
+        return quat.fromValues(qRel[0], qRel[2], -qRel[1], qRel[3]);
     }
 
-    function getObjectPosition(){
-        
-    }
+    // TODO: placeObject
+    //function placeObject(entity, localCameraPose, globalObjectPose, globalCameraPose){
+    //
+    //}
 
     /**
      *  Places the content provided by a call to a Spacial Content Discovery server.
@@ -433,6 +451,8 @@
      * @param localPose XRPose    The pose of the device when localisation was started
      */
     function placeContent(globalPose, scr, localPose) {
+        
+        /*
         console.log('local image pose:');
         let localImagePoseMat4 = localPose.transform.matrix;
         console.log(localImagePoseMat4);
@@ -449,18 +469,19 @@
         let globalImagePoseInvMat4 = mat4.create();
         mat4.invert(globalImagePoseInvMat4, globalImagePoseMat4);
         console.log(globalImagePoseInvMat4);
-        
 
         console.log("TEST inverse:");
         let test = mat4.create();
         mat4.multiply(test, globalImagePoseMat4, globalImagePoseInvMat4);
         console.log(test); // this should be identity matrix - OK
-
+        */
 
         scr.forEach(record => {
             console.log("=== SCR ===========")
             // This is difficult to generalize, because there are no types defined yet.
             if (record.content.type === 'placeholder') {
+
+                // WARNING: AC's current version returns lat and lon swapped, so we need to swap them here.
                 if ($availableContentServices[0].url.includes('augmented.city')) {
                     record.content.geopose.pose = flipLatLon(record.content.geopose.pose);
                 }
@@ -514,6 +535,7 @@
                 //conceptually it should read the other way round: Tcam2model = Tcam2pic * Tpic2geo * Tgeo2model 
                 
                 
+                /*
                 console.log("temp0:");
                 let temp0 = mat4.create();
                 console.log(temp0);
@@ -540,14 +562,13 @@
                 let q = quat.create(); mat4.getRotation(q, localObjectPoseMat4);
                 let t = vec3.create(); mat4.getTranslation(t, localObjectPoseMat4);
                 let s = vec3.create(); mat4.getScaling(s, localObjectPoseMat4); // this should be all 1s - OK
-                
+                */
 
                 //////////////////
 
                 const placeholder = createPlaceholder(record.content.keywords);
-                
-                //placeObject(placeholder, localImagePoseMat4, globalObjectPose, globalImagePose);
 
+                //placeObject(placeholder, localImagePoseMat4, globalObjectPose, globalImagePose);
 
                 let relativePosition = getRelativeGlobalPosition(globalImagePose, globalObjectPose);
                 let relativeOrientation = getRelativeGlobalOrientation(globalImagePose, globalObjectPose);
@@ -562,25 +583,23 @@
                 let localCameraPosition = vec3.create();
                 mat4.getTranslation(localCameraPosition, localImagePoseMat4);
                 let localObjectPosition = vec3.create();
-                vec3.add(localObjectPosition, localCameraPosition, relativePosition);
-                
+                vec3.add(localObjectPosition, localCameraPosition, relativePosition)
+
                 let localCameraOrientation = quat.create();
                 mat4.getRotation(localCameraOrientation, localImagePoseMat4);
                 let localObjectOrientation = quat.create();
                 quat.multiply(localObjectOrientation, relativeOrientation, localCameraOrientation);
-                
 
                 console.log("localObjectPosition:");
                 console.log(localObjectPosition);
                 console.log("localObjectOrientation:");
                 console.log(localObjectOrientation);
-                
-                q = localObjectOrientation;
-                t = localObjectPosition;
-                //placeholder.setLocalRotation(q);
-                //placeholder.setLocalPosition(t);
+
+                //placeholder.setLocalRotation(localObjectOrientation;
+                //placeholder.setLocalPosition(localObjectPosition);
                 placeholder.setPosition(localObjectPosition[0], localObjectPosition[1], localObjectPosition[2]); // from vec3 to Vec3
                 placeholder.setRotation(localObjectOrientation[0], localObjectOrientation[1], localObjectOrientation[2], localObjectOrientation[3]); // from quat to Quat
+                // TODO: local or global rotation??
                 //placeholder.translate(localObjectPosition);
                 //console.log("object's local transform:");
                 //console.log(placeholder.getLocalTransform());
