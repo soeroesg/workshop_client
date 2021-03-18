@@ -8,10 +8,11 @@
  */
 
 import LatLon from 'geodesy/latlon-ellipsoidal-vincenty.js';
+import { quat, vec3 } from 'gl-matrix';
 
 
-export const toRadians = (degrees) => degrees * (Math.PI / 180);
-export const toDegree = (radians) => radians / (Math.PI / 180);
+export const toRadians = (degrees) => degrees * Math.PI / 180;
+export const toDegrees = (radians) => radians / Math.PI / 180;
 
 /*
 // Michael
@@ -309,22 +310,117 @@ export const fakeLocationResult = {
 }
 
 /**
- *  Calculates the local position of a provided GeoPose in relation to the provided local reference pose.
+ *  Calculates the relative distance of two geodesic locations.
+ *
+ *  Used to calculate the relative distance between the device location at the moment of localisation and the
+ *  location of an object as received from content discovery service.
  *
  * @param localisationPose  XRPose      Local pose provided by the XRSession for the latest localisation
  * @param objectPose  GeoPose       Global position as provided by a request to a Spatial Content Discovery server
- * @returns {number{}}      Local location of the global GeoPose relative to the provided local pose
+ * @returns {[x,y,z]}      Local location of the global GeoPose relative to the provided local pose
  */
-export function calculateLocalLocation(localisationPose, objectPose) {
-    const from = new LatLon( localisationPose.latitude, localisationPose.longitude );
-    const to = new LatLon( objectPose.latitude, objectPose.longitude );
+export function calculateDistance(localisationPose, objectPose) {
+    const centerPoint = new LatLon(localisationPose.latitude, localisationPose.longitude);
+    const latDiff = new LatLon( objectPose.latitude, localisationPose.longitude );
+    const lonDiff = new LatLon( localisationPose.latitude, objectPose.longitude );
 
-    const distance = from.distanceTo(to);
-    const bearing = from.initialBearingTo(to);
-
-    const xValue = distance * Math.cos(toRadians(bearing));
-    const yValue = distance * Math.sin(toRadians(bearing));
+    const xValue = centerPoint.distanceTo(lonDiff);
+    const yValue = centerPoint.distanceTo(latDiff);
 
     // TODO: Add y-value when receiving valid height value from GeoPose service
     return {x:xValue, y:0.0, z:-yValue};
+}
+
+
+/**
+ * Calculates the distance between two quaternions.
+ *
+ * Used to calculate the difference between the device rotation at the moment of localisation of the local and
+ * global poses.
+ *
+ * @param localisationQuaternion  Quaternion        Rotation returned by a GeoPose service after localisation (Array)
+ * @param localQuaternion  Quaternion       Rotation reported from WebGL at the moment localisation was started
+ * @returns {{x, y, z, w}}
+ */
+export function calculateRotation(localisationQuaternion, localQuaternion) {
+    const global = quat.fromValues(localisationQuaternion[0], localisationQuaternion[1], localisationQuaternion[2], localisationQuaternion[3]);
+    const local = quat.fromValues(localQuaternion.x, localQuaternion.y, localQuaternion.z, localQuaternion.w);
+
+    const localInv = quat.create();
+    quat.invert(localInv , global);
+
+    const diff = quat.create();
+    quat.multiply(diff , global, localInv);
+
+    return diff;
+}
+
+
+/**
+ * Calculates the distance between two quaternions.
+ *
+ * Used to calculate the difference between the device rotation at the moment of localisation of the local and
+ * global poses.
+ *
+ * @param localisationQuaternion  Quaternion        Rotation returned by a GeoPose service after localisation (Array)
+ * @param localQuaternion  Quaternion       Rotation reported from WebGL at the moment localisation was started
+ * @returns {{x, y, z}}
+ */
+export function calculateEulerRotation(localisationQuaternion, localQuaternion) {
+    const diff = calculateRotation(localisationQuaternion, localQuaternion);
+
+    const euler = vec3.create();
+    getEuler(euler, diff);
+    return euler;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+/**
+ * Returns an euler angle representation of a quaternion.
+ *
+ * Taken from gl-matrix issue #329. Will be remove when added to gl-matrix
+ *
+ * @param  {vec3} out Euler angles, pitch-yaw-roll
+ * @param  {quat} mat Quaternion
+ * @return {vec3} out
+ */
+function getEuler(out, quat) {
+    let x = quat[0],
+        y = quat[1],
+        z = quat[2],
+        w = quat[3],
+        x2 = x * x,
+        y2 = y * y,
+        z2 = z * z,
+        w2 = w * w;
+    let unit = x2 + y2 + z2 + w2;
+    let test = x * w - y * z;
+    if (test > 0.499995 * unit) { //TODO: Use glmatrix.EPSILON
+        // singularity at the north pole
+        out[0] = Math.PI / 2;
+        out[1] = 2 * Math.atan2(y, x);
+        out[2] = 0;
+    } else if (test < -0.499995 * unit) { //TODO: Use glmatrix.EPSILON
+        // singularity at the south pole
+        out[0] = -Math.PI / 2;
+        out[1] = 2 * Math.atan2(y, x);
+        out[2] = 0;
+    } else {
+        out[0] = Math.asin(2 * (x * z - w * y));
+        out[1] = Math.atan2(2 * (x * w + y * z), 1 - 2 * (z2 + w2));
+        out[2] = Math.atan2(2 * (x * y + z * w), 1 - 2 * (y2 + z2));
+    }
+    // TODO: Return them as degrees and not as radians
+    return out;
 }
