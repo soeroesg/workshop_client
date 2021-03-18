@@ -297,10 +297,11 @@
         gl.deleteProgram(cameraShader);
         cameraShader = null;
 
+        // TODO:
         // DEBUG: to verify if the image was captured correctly
-        // const img = new Image();
-        // img.src = image;
-        // document.body.appendChild(img);
+        const img = new Image();
+        img.src = image;
+        document.body.appendChild(img);
 
         return image;
     }
@@ -319,6 +320,7 @@
 
     function localize(localPose, image, width, height) {
         return new Promise((resolve, reject) => {
+/*
             const geoPoseRequest = new GeoPoseRequest(uuidv4())
                 .addCameraData(IMAGEFORMAT.JPG, [width, height], image.split(',')[1], 0, new ImageOrientation(false, 0))
                 .addLocationData($initialLocation.lat, $initialLocation.lon, 0, 0, 0, 0, 0);
@@ -341,16 +343,16 @@
                     console.error(error);
                     reject(error);
                 });
-/*
+*/
             {
                 // Stored SCD response for development
                 console.log('fake localisation');
                 isLocalized = true;
-                wait(1000).then(showFooter = false);
+                wait(1000).then(showFooter = false);  // TODO: resolve AFTER the 1sec? .then()
                 resolve([fakeLocationResult.geopose.pose, fakeLocationResult.scrs])
             }
-*/
-    });
+        });
+    }
 
 
     // TODO: 
@@ -464,10 +466,7 @@
      * @param scr  SCR Spatial      Content Record with the result from the server request
      */
     function placeContent(localPose, globalPose, scr) {
-        const localPosition = localPose.transform.position;
-
-
-        /*
+        
         console.log('local image pose:');
         let localImagePoseMat4 = localPose.transform.matrix;
         console.log(localImagePoseMat4);
@@ -476,6 +475,7 @@
         let globalImagePose = globalPose;
         console.log(globalImagePose);
         
+        /*
         console.log('global image pose:');
         let globalImagePoseMat4 = convertGeoPose2PoseMat(globalPose);
         console.log(globalImagePoseMat4);
@@ -502,6 +502,7 @@
             if (record.content.type === 'placeholder') {
 
                 /*
+                const localPosition = localPose.transform.position;
                 const contentPosition = calculateDistance(globalPose, objectPose);
                 const placeholder = createPlaceholder(record.content.keywords);
                 placeholder.setPosition(contentPosition.x + localPosition.x,contentPosition.y + localPosition.y,
@@ -618,7 +619,7 @@
 
                 app.root.addChild(placeholder);
             }
-        })
+        });
 
     }
 
