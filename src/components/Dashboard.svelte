@@ -13,7 +13,7 @@
 
     import { showDashboard, initialLocation, availableGeoPoseServices, availableContentServices,
         selectedGeoPoseService, selectedContentService, arMode, currentMarkerImage,
-        currentMarkerImageWidth } from '@src/stateStore';
+        currentMarkerImageWidth, recentLocalisation, debug_appendCameraImage } from '@src/stateStore';
 
     import { ARMODES } from '@core/common';
 
@@ -23,9 +23,14 @@
 </script>
 
 
+<style>
+    button {
+        margin: 50px;
+    }
+</style>
+
+
 <!-- TODO: Extract strings to contentStore -->
-<!-- TODO: Add countrycode -->
-<!-- TODO: Add GeoPose -->
 
 <div>
     <input id="showagain" type="checkbox" bind:checked={$showDashboard} />
@@ -35,7 +40,9 @@
 <dl>
     <dt>H3Index</dt>
     <dd>{$initialLocation.h3Index}</dd>
-    <dt>Region code</dt>
+    <dt>Country</dt>
+    <dd>{$initialLocation.countryCode}</dd>
+    <dt>OSCP Region</dt>
     <!--  TODO: Might make sense to do some validation here  -->
     <dd><input list="supported-countries" bind:value={$initialLocation.regionCode} /></dd>
 </dl>
@@ -43,7 +50,8 @@
 <dl>
     <dt>AR mode</dt>
     <dd>
-        <input id="armodeoscp" type="radio" bind:group={$arMode} value="{ARMODES.oscp}" />
+        <input id="armodeoscp" type="radio" bind:group={$arMode} value="{ARMODES.oscp}"
+               disabled="{$availableGeoPoseServices.length === 0  || null}"/>
         <label for="armodeoscp">{ARMODES.oscp}</label>
     </dd>
     <dd>
@@ -56,6 +64,11 @@
     </dd>
 </dl>
 
+<div>
+    <input id="appendcameraimage" type="checkbox" bind:checked={$debug_appendCameraImage} />
+    <label for="appendcameraimage">Append captured image</label>
+</div>
+
 <dl>
     <dt>GeoPose Server</dt>
     <dd><select bind:value={$selectedGeoPoseService} disabled="{$availableGeoPoseServices.length === 0  || null}">
@@ -67,6 +80,14 @@
             {/each}
         {/if}
     </select></dd>
+</dl>
+
+<dl>
+    <dt>Recent GeoPose</dt>
+    <dd><pre>{JSON.stringify($recentLocalisation.geopose, null, 2)}</pre></dd>
+<!--    TODO: Values aren't displayed for some reason. Fix. -->
+<!--    <dt>at</dt>-->
+<!--    <dd><pre>{JSON.stringify($recentLocalisation.localpose, null, 2)}</pre></dd>-->
 </dl>
 
 <dl>

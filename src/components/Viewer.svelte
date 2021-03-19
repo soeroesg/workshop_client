@@ -18,13 +18,12 @@
     import ImageOrientation from 'gpp-access/request/options/ImageOrientation.js';
     import { IMAGEFORMAT } from 'gpp-access/GppGlobals.js';
 
+    import { wait, ARMODES, debounce } from "@core/common";
     import { initialLocation, availableContentServices, currentMarkerImage,
-        currentMarkerImageWidth, selectedGeoPoseService } from '@src/stateStore';
-    import { createImageFromTexture, wait, ARMODES } from "@core/common";
+         currentMarkerImageWidth, recentLocalisation, debug_appendCameraImage, selectedGeoPoseService } from '@src/stateStore';
     import { createModel, createPlaceholder, createObject, addLight, addLogo, addAxes } from '@core/modelTemplates';
     import { calculateDistance, fakeLocationResult, calculateEulerRotation, toDegrees } from '@core/locationTools';
-
-    import { initializeGLCube, drawScene } from '@core/texture';
+    import { initCameraCaptureScene, drawCameraCaptureScene, createImageFromTexture } from '@core/cameraCapture';
     import ArCloudOverlay from "./dom-overlays/ArCloudOverlay.svelte";
     import MarkerOverlay from "./dom-overlays/MarkerOverlay.svelte";
 
@@ -45,15 +44,22 @@
     let app;
 
     let doCaptureImage = false;
-    let showFooter = false, hasPose = false, isLocalizing = false, isLocalized = false;
+    let showFooter = false, hasPose = false, isLocalizing = false, isLocalized = false, hasLostTracking = false;
 
     let xrRefSpace = null;
 
     let gl = null;
     let glBinding = null;
-    let cameraShader = null;
 
     let trackedImage, trackedImageObject;
+
+    // TODO: replace with dashboard settings
+    let debugFakeLocation = true;
+    let debugShowCapturedImage = true;
+    let debugShowLocalAxes = true;
+
+    let poseFoundHeartbeat = null;
+
 
 
     /**
@@ -92,7 +98,7 @@
             message("Immersive AR is " + (available ? 'available' : 'unavailable'));
             if (available && !app.xr.active) {
                 const camera = setupEnvironment();
-                startSession(camera);
+                startSession(camera); // TODO: camera should be called cameraNode
             }
         });
 
@@ -129,10 +135,11 @@
 
         addLight(app);
 
-        addAxes(app);
-
         //addLogo(app); // async
 
+        if (debugShowLocalAxes) {
+            addAxes(app);
+        }
 
         return camera;
     }
@@ -148,7 +155,7 @@
         if (activeArMode === ARMODES.oscp) {
             options = {
                 requiredFeatures: ['dom-overlay', 'camera-access'],
-                callback: oscpModeCallback
+                callback: onXRSessionStartedOSCP
             }
             //camera.camera.startXr(pc.XRTYPE_AR, pc.XRSPACE_LOCALFLOOR, options);
             // XRSPACE_UNBOUNDED -- PlayCanvas documentation says this is for untethered VR, and for AR we should use VIEWER
@@ -158,7 +165,7 @@
             options = {
                 requiredFeatures: ['image-tracking'],
                 imageTracking: true,
-                callback: markerModeCallback
+                callback: onXRSessionStartedMarker
             }
             setupMarkers()
                 .then(() => camera.camera.startXr(pc.XRTYPE_AR, pc.XRSPACE_LOCALFLOOR, options));
@@ -180,7 +187,7 @@
     /**
      * Executed when XRSession was successfully created for AR mode 'marker'.
      */
-    function markerModeCallback(error) {
+    function onXRSessionStartedMarker(error) {
         if (error) {
             message("WebXR Immersive AR failed to start: " + error.message);
             throw new Error(error.message);
@@ -194,22 +201,22 @@
     /**
      * Executed when XRSession was successfully created for AR mode 'oscp'.
      */
-    function oscpModeCallback(error) {
+    function onXRSessionStartedOSCP(error) {
         if (error) {
             message("WebXR Immersive AR failed to start: " + error.message);
             throw new Error(error.message);
         }
 
-        gl = canvas.getContext('webgl2', {xrCompatible: true});
+        gl = canvas.getContext('webgl2', {xrCompatible: true}); // NOTE: preserveDrawingBuffer: true seems to have no effect
         glBinding = new XRWebGLBinding(app.xr.session, gl);
-
-        // cameraShader = initializeGLCube(gl);
 
         app.xr.session.updateRenderState({baseLayer: new XRWebGLLayer(app.xr.session, gl)});
         //app.xr.session.requestReferenceSpace('local').then((refSpace) => {
             app.xr.session.requestReferenceSpace('unbounded').then((refSpace) => {
             xrRefSpace = refSpace;
         });
+
+        initCameraCaptureScene(gl);
     }
 
     /**
@@ -228,12 +235,29 @@
     function onUpdate(frame) {
         const localPose = frame.getViewerPose(xrRefSpace);
 
-        if (activeArMode === ARMODES.oscp && localPose) {
-            hasPose = true;
-            handlePose(localPose, frame);
-        } else if (activeArMode === ARMODES.marker) {
-            handleMarker();
+        if (localPose) {
+            handlePoseHeartbeat();
+
+            if (activeArMode === ARMODES.oscp) {
+                hasPose = true;
+                handlePose(localPose, frame);
+            } else if (activeArMode === ARMODES.marker) {
+                handleMarker();
+            }
         }
+    }
+
+    /**
+     * Handles a pose found heartbeat. When it's not triggered for a specific time (300ms as default) an indicator
+     * is shown to let the user know that the tracking was lost.
+     */
+    function handlePoseHeartbeat() {
+        hasLostTracking = false;
+        if (poseFoundHeartbeat === null) {
+            poseFoundHeartbeat = debounce(() => hasLostTracking = true);
+        }
+
+        poseFoundHeartbeat();
     }
 
     /**
@@ -252,58 +276,52 @@
     }
 
     /**
-     * Handles update loop when ARCloud mode is used.
+     * Handles update loop when AR Cloud mode is used.
      *
-     * @param localPose      The pose of the device as reported by the XRFrame
+     * @param localPose The pose of the device as reported by the XRFrame
      * @param frame     The XRFrame provided to the update loop
      */
     function handlePose(localPose, frame) {
-        gl.bindFramebuffer(gl.FRAMEBUFFER, app.xr.session.renderState.baseLayer.framebuffer);
 
-        for (let view of localPose.views) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, app.xr.session.renderState.baseLayer.framebuffer);
+        
+        for (let view of localPose.views) { // TODO: why run this code for every view?
             let viewport = app.xr.session.renderState.baseLayer.getViewport(view);
             gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
+            
+            // NOTE: if we do not draw anything on pose update for more than 5 frames, Chrome's WebXR sends warnings
+            // See OnFrameEnd() in https://chromium.googlesource.com/chromium/src/third_party/+/master/blink/renderer/modules/xr/xr_webgl_layer.cc
+
+            // We want to capture the camera image, however, it is not directly available here,
+            // but only as a GPU texture. We draw something textured with the camera image at every frame,
+            // so that the texture is kept in GPU memory. We can then capture it below.
+            const cameraTexture = glBinding.getCameraImage(frame, view);
+            drawCameraCaptureScene(gl, cameraTexture);
 
             if (doCaptureImage) {
                 doCaptureImage = false;
 
-                const image = captureImage(frame, view, viewport, localPose.cameraViews[0]);
+                // TODO: try to queue the camera capture code on XRSession.requestAnimationFrame()
+
+                const image = createImageFromTexture(gl, cameraTexture, viewport.width, viewport.height);
+                
+                if (debugShowCapturedImage) {
+                    // DEBUG: verify if the image was captured correctly
+                    const img = new Image();
+                    img.src = image;
+                    document.body.appendChild(img);
+                }
+
                 localize(localPose, image, viewport.width, viewport.height)
                     // When localisation didn't already provide content, needs to be requested here
-                    .then(([geoPose, data]) => placeContent(localPose, geoPose, data));
+                    .then(([geoPose, data]) => {
+                        $recentLocalisation.geopose = geoPose;
+                        $recentLocalisation.localpose = localPose.transform;
+
+                        placeContent(localPose, geoPose, data);
+                    });
             }
         }
-    }
-
-    /**
-     * Get the camera image from WebXR.
-     *
-     * @param frame  XRFrame        Provides access to the information needed in order to render a single frame of
-     *                              animation for an XRSession describing a VR or AR sccene
-     * @param view  XRView      Provides information describing a single view into the XR scene for a specific frame,
-     *                          providing orientation and position information for the viewpoint
-     * @param viewport  XRViewPort      Provides properties used to describe the size and position of the current
-     *                                  viewport within the XRWebGLLayer being used to render the 3D scene
-     * @param cameraView  WebGLTexture      The texture with the camera image
-     */
-    function captureImage(frame, view, viewport, cameraView) {
-        cameraShader = initializeGLCube(gl);
-        const cameraTexture = glBinding.getCameraImage(frame, cameraView);
-        drawScene(gl, cameraTexture, view);
-
-        const image = createImageFromTexture(gl, cameraTexture, viewport.width, viewport.height);
-
-        // WebGL shader was installed earlier to get the camera image rendered onto the texture
-        gl.deleteProgram(cameraShader);
-        cameraShader = null;
-
-        // TODO:
-        // DEBUG: to verify if the image was captured correctly
-        const img = new Image();
-        img.src = image;
-        document.body.appendChild(img);
-
-        return image;
     }
 
     /**
@@ -320,7 +338,8 @@
 
     function localize(localPose, image, width, height) {
         return new Promise((resolve, reject) => {
-/*
+            if (!debugFakeLocation) {
+
             const geoPoseRequest = new GeoPoseRequest(uuidv4())
                 .addCameraData(IMAGEFORMAT.JPG, [width, height], image.split(',')[1], 0, new ImageOrientation(false, 0))
                 .addLocationData($initialLocation.lat, $initialLocation.lon, 0, 0, 0, 0, 0);
@@ -330,6 +349,7 @@
 
             sendRequest(`${$availableContentServices[0].url}/${objectEndpoint}`, JSON.stringify(geoPoseRequest))
                 .then(data => {
+                    isLocalizing = false;
                     isLocalized = true;
                     wait(1000).then(showFooter = false);
 
@@ -343,8 +363,8 @@
                     console.error(error);
                     reject(error);
                 });
-*/
-            {
+
+            } else {
                 // Stored SCD response for development
                 console.log('fake localisation');
                 isLocalized = true;
@@ -498,6 +518,12 @@
             // Augmented City special path for the GeoPose. Should be just 'record.content.geopose'
             const objectPose = record.content.geopose.pose;
 
+            if (debugFakeLocation) {
+                if ($availableContentServices[0].url.includes('augmented.city')) {
+                        [objectPose.longitude, objectPose.latitude] = [objectPose.latitude, objectPose.longitude];
+                }
+            }
+
             // This is difficult to generalize, because there are no types defined yet.
             if (record.content.type === 'placeholder') {
 
@@ -505,8 +531,10 @@
                 const localPosition = localPose.transform.position;
                 const contentPosition = calculateDistance(globalPose, objectPose);
                 const placeholder = createPlaceholder(record.content.keywords);
-                placeholder.setPosition(contentPosition.x + localPosition.x,contentPosition.y + localPosition.y,
-                    contentPosition.z + localPosition.z);
+                placeholder.setPosition(contentPosition.x + localPosition.x,
+                                        contentPosition.y + localPosition.y,
+                                        contentPosition.z + localPosition.z);
+
                 const rotation = calculateEulerRotation(globalPose.quaternion, localPose.transform.orientation);
                 placeholder.rotate(toDegrees(rotation[0]), toDegrees(rotation[1]), toDegrees(rotation[2]));
                 */
@@ -617,6 +645,7 @@
                 //console.log("object's local transform:");
                 //console.log(placeholder.getLocalTransform());
 
+                console.log("placeholder at: " + contentPosition.x + ", " + contentPosition.y + ", " +  contentPosition.z);
                 app.root.addChild(placeholder);
             }
         });
@@ -647,21 +676,38 @@
 
         text-align: center;
     }
+
+    #trackinglostindicator {
+        position: absolute;
+        right: 10px;
+        bottom: 10px;
+
+        width: 2em;
+        height: 2em;
+
+        background-color: red;
+
+        border-radius: 50%;
+    }
 </style>
 
 
 <canvas id='application' bind:this={canvas}></canvas>
 <aside bind:this={overlay} on:beforexrselect={(event) => event.preventDefault()}>
-    {#if showFooter}
+    {#if showFooter || hasLostTracking}
         <footer>
             {#if activeArMode === ARMODES.oscp}
-            <ArCloudOverlay hasPose="{hasPose}" isLocalizing="{isLocalizing}" isLocalized="{isLocalized}"
+                <ArCloudOverlay hasPose="{hasPose}" isLocalizing="{isLocalizing}" isLocalized="{isLocalized}"
                         on:startLocalisation={startLocalisation} />
             {:else if activeArMode === ARMODES.marker}
                 <MarkerOverlay />
             {:else}
                 <p>Somethings wrong...</p>
                 <p>Apologies.</p>
+            {/if}
+
+            {#if hasLostTracking}
+                <div id="trackinglostindicator"></div>
             {/if}
         </footer>
     {/if}

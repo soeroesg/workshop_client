@@ -10,7 +10,7 @@
 
 import { readable, writable, derived } from 'svelte/store';
 
-import { LOCATIONINFO, SERVICE, ARMODES } from "./core/common.js";
+import { LOCATIONINFO, SERVICE, ARMODES, GEOPOSE, LOCALPOSE } from "./core/common.js";
 
 
 /**
@@ -73,6 +73,7 @@ export const initialLocation = writable({
     h3Index: 0,
     lat: 0,
     lon: 0,
+    countryCode: '',
     regionCode: ''
 });
 
@@ -130,6 +131,13 @@ export const availableContentServices = derived(ssr, ($ssr, set) => {
 export const selectedGeoPoseService = writable('none');
 
 
+export const recentLocalisation = writable({
+    geopose: {},
+    localpose: {}
+})
+
+
+
 /**
  * The one of the returned content services to be used to look for content around the current location.
  *
@@ -152,3 +160,19 @@ export const currentMarkerImage = writable('marker.jpg');
  * @type {Writable<string>}
  */
 export const currentMarkerImageWidth = writable('0.2');
+
+
+
+
+
+
+/**
+ * Appends the captured image used for localisation to the body an an image element.
+ *
+ * @type {Writable<boolean>}
+ */
+const storedDebug_appendCameraImage = localStorage.getItem('debug_appendCameraImage') === 'true';
+export const debug_appendCameraImage = writable(storedDebug_appendCameraImage);
+debug_appendCameraImage.subscribe(value => {
+    localStorage.setItem('debug_appendCameraImage', value === true ? 'true' : 'false');
+})
