@@ -497,6 +497,22 @@
         console.log(test); // this should be identity matrix - OK
         */
 
+
+        let virtualCamera = createObject("box", new pc.Color(1,1,0));
+        virtualCamera.setLocalScale(0.1, 0.2, 0.3);
+        app.root.addChild(virtualCamera);
+        virtualCamera.setPosition(localPose.transform.position.x,
+                                  localPose.transform.position.y,
+                                  localPose.transform.position.z);
+        virtualCamera.setRotation(localPose.transform.orientation.x,
+                                  localPose.transform.orientation.y,
+                                  localPose.transform.orientation.z,
+                                  localPose.transform.orientation.w);
+         // HACK: additional 90 deg rotation around forward axis
+         //virtualCamera.rotateLocal(0, 0, -90); // Euler angles in degrees
+
+        console.log(virtualCamera.transform);
+
         let cnt = 0;
         scr.forEach(record => {
             console.log("=== SCR ===========")
@@ -504,7 +520,7 @@
             // Augmented City special path for the GeoPose. Should be just 'record.content.geopose'
             let objectPose = record.content.geopose.pose;
 
-
+/*
             //HACK: line up objects
             objectPose.quaternion[0] = 0;
             objectPose.quaternion[1] = 0;
@@ -513,10 +529,11 @@
             objectPose.latitude = globalPose.latitude - 0.0001;
             objectPose.longitude = globalPose.longitude + 0.0001 * cnt; cnt = cnt + 1;
             objectPose.altitude = 0;
-
+*/
             // This is difficult to generalize, because there are no types defined yet.
             if (record.content.type === 'placeholder') {
 
+/*
                 const localPosition = localPose.transform.position;
                 const contentPosition = calculateDistance(globalPose, objectPose);
                 const placeholder = createPlaceholder(record.content.keywords);
@@ -526,8 +543,7 @@
                 const dRotation = calculateRotation(globalPose.quaternion, localPose.transform.orientation);
                 const rotation = quat.fromValues(dRotation[0], dRotation[2], -dRotation[1], dRotation[3]); // from Geo to WebGL axes
                 placeholder.setRotation(rotation[0], rotation[1], rotation[2], rotation[3]); // from quat to Quat
-
-
+*/
 
 /*
                 // rotate everything by how much the camera has rotated so far
@@ -535,6 +551,20 @@
                 mat4.getRotation(qCam, localPose.transform.matrix);
                 placeholder.setRotation(qCam);
 */
+                //////////////
+
+                const placeholder = createPlaceholder(record.content.keywords);
+                virtualCamera.addChild(placeholder);
+
+                const contentPosition = calculateDistance(globalPose, objectPose);
+                placeholder.setLocalPosition(contentPosition.x,
+                                             contentPosition.y,
+                                             contentPosition.z);
+                const dRotation = calculateRotation(globalPose.quaternion, localPose.transform.orientation);
+                //const rotation = quat.fromValues(dRotation[0], dRotation[2], -dRotation[1], dRotation[3]); // from Geo to WebGL axes
+                const rotation = quat.fromValues(dRotation[0], dRotation[1], dRotation[2], dRotation[3]); // from Geo to WebGL axes
+                placeholder.setLocalRotation(rotation[0], rotation[1], rotation[2], rotation[3]); // from quat to Quat
+
 
                 //////////////
 
@@ -649,9 +679,11 @@
                 placeholder.model.material = material;
 
                 console.log("placeholder at: " + placeholder.getPosition().x + ", " + placeholder.getPosition().y + ", " +  placeholder.getPosition().z);
-                app.root.addChild(placeholder);
+                //app.root.addChild(placeholder);
             }
         });
+
+       
 
     }
 </script>
