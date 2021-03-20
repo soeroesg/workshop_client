@@ -12,8 +12,10 @@
     import { supportedCountries} from 'ssd-access';
 
     import { showDashboard, initialLocation, availableGeoPoseServices, availableContentServices,
-        selectedGeoPoseService, selectedContentService, arMode, currentMarkerImage,
-        currentMarkerImageWidth, recentLocalisation, debug_appendCameraImage } from '@src/stateStore';
+        availableP2pServices, selectedGeoPoseService, selectedContentService, selectedP2pService, arMode,
+        currentMarkerImage, currentMarkerImageWidth, recentLocalisation, debug_appendCameraImage,
+        debug_showLocationAxis, debug_useLocalServerResponse, allowP2pNetwork, p2pNetworkState
+        } from '@src/stateStore';
 
     import { ARMODES } from '@core/common';
 
@@ -31,6 +33,12 @@
 
 
 <!-- TODO: Extract strings to contentStore -->
+
+
+<button on:click={() => dispatch('okClicked')}>Go immersive</button>
+
+
+<h2>Application state</h2>
 
 <div>
     <input id="showagain" type="checkbox" bind:checked={$showDashboard} />
@@ -64,14 +72,9 @@
     </dd>
 </dl>
 
-<div>
-    <input id="appendcameraimage" type="checkbox" bind:checked={$debug_appendCameraImage} />
-    <label for="appendcameraimage">Append captured image</label>
-</div>
-
 <dl>
     <dt>GeoPose Server</dt>
-    <dd><select bind:value={$selectedGeoPoseService} disabled="{$availableGeoPoseServices.length === 0  || null}">
+    <dd><select bind:value={$selectedGeoPoseService} disabled="{$availableGeoPoseServices.length < 2  || null}">
         {#if $availableGeoPoseServices.length === 0}
             <option>None</option>
         {:else}
@@ -92,11 +95,24 @@
 
 <dl>
     <dt>Content Server</dt>
-    <dd><select bind:value={$selectedContentService} disabled="{$availableContentServices.length === 0  || null}">
+    <dd><select bind:value={$selectedContentService} disabled="{$availableContentServices.length < 2  || null}">
         {#if $availableContentServices.length === 0}
             <option>None</option>
         {:else}
             {#each $availableContentServices as service}
+                <option value={service}>{service.title}</option>
+            {/each}
+        {/if}
+    </select></dd>
+</dl>
+
+<dl>
+    <dt>P2P Service</dt>
+    <dd><select bind:value={$selectedP2pService} disabled="{$availableP2pServices.length < 2  || null}">
+        {#if $availableP2pServices.length === 0}
+            <option>None</option>
+        {:else}
+            {#each $availableP2pServices as service}
                 <option value={service}>{service.title}</option>
             {/each}
         {/if}
@@ -113,11 +129,27 @@
 <p>Headless available (y/n)</p>
 
 <div>
-    <input id="allowP2p" type="checkbox" checked />
-    <label for="allowP2p">Connect to local network</label>
-    <p>Connected to p2p network</p>
+    <input id="allowP2p" type="checkbox" bind:checked={$allowP2pNetwork} />
+    <label for="allowP2p">Connect to local p2p network</label>
+    <p>{$p2pNetworkState}</p>
 </div>
 
-<button on:click={() => dispatch('okClicked')}>Go immersive</button>
+<h2>Debug settings</h2>
+
+<div>
+    <input id="appendcameraimage" type="checkbox" bind:checked={$debug_appendCameraImage} />
+    <label for="appendcameraimage">Append captured image</label>
+</div>
+
+<div>
+    <input id="showlocationaxis" type="checkbox" bind:checked={$debug_showLocationAxis} />
+    <label for="showlocationaxis">Show local zero point markers</label>
+</div>
+
+<div>
+    <input id="uselocalserverresponse" type="checkbox" bind:checked={$debug_useLocalServerResponse} />
+    <label for="uselocalserverresponse">Use local server response</label>
+</div>
+
 
 {@html supportedCountries}

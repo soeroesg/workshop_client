@@ -12,8 +12,8 @@ import { quat, vec3 } from 'gl-matrix';
 import * as h3 from "h3-js";
 import { supportedCountries } from 'ssd-access';
 
-export const toRadians = (degrees) => degrees * Math.PI / 180;
-export const toDegrees = (radians) => radians / Math.PI / 180;
+export const toRadians = (degrees) => degrees / 180 * Math.PI;
+export const toDegrees = (radians) => radians / Math.PI * 180;
 
 /*
 // Michael
@@ -70,8 +70,8 @@ export const fakeLocationResult = {
                     "pose": {
                         "altitude": -0.2476527839899063,
                         "ellipsoidHeight": -1,
-                        "latitude": 8.545727117939203, // TODO: swap
-                        "longitude": 48.75619913985165,
+                        "latitude": 48.75619913985165,
+                        "longitude": 8.545727117939203,
                         "quaternion": [
                             0.6316581032678967,
                             -0.3041746084477361,
@@ -117,8 +117,8 @@ export const fakeLocationResult = {
                     "pose": {
                         "altitude": -0.05442802235484123,
                         "ellipsoidHeight": -1,
-                        "latitude": 8.545694856385769,
-                        "longitude": 48.75619800176131,
+                        "latitude": 48.75619800176131,
+                        "longitude": 8.545694856385769,
                         "quaternion": [
                             0.10833754747430582,
                             -0.7679511427475457,
@@ -203,8 +203,8 @@ export const fakeLocationResult = {
                     "pose": {
                         "altitude": -1.42364501953125,
                         "ellipsoidHeight": -1,
-                        "latitude": 19.024833019394446, // TODO: swap
-                        "longitude": 47.46775486879815,
+                        "latitude": 47.46775486879815,
+                        "longitude": 19.024833019394446,
                         "quaternion": [
                             -0.05238614875722129,
                             -0.8257331266006536,
@@ -250,8 +250,8 @@ export const fakeLocationResult = {
                     "pose": {
                         "altitude": 0.766888439655304,
                         "ellipsoidHeight": -1,
-                        "latitude": 19.025066403025875, // TODO: swap
-                        "longitude": 47.467689854053496,
+                        "latitude": 47.467689854053496,
+                        "longitude": 19.025066403025875,
                         "quaternion": [
                             -0.038424859835383816,
                             -0.249253946378255,
