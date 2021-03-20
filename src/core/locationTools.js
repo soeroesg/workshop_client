@@ -12,6 +12,8 @@ import { quat, vec3 } from 'gl-matrix';
 import * as h3 from "h3-js";
 import { supportedCountries } from 'ssd-access';
 
+import "@thirdparty/playcanvas.min.js"; // for pc.Color
+
 export const toRadians = (degrees) => degrees / 180 * Math.PI;
 export const toDegrees = (radians) => radians / Math.PI * 180;
 
@@ -149,6 +151,23 @@ export const fakeLocationResult = {
     ]
 }
 */
+
+export function getColorForContentId(id) {
+    if (id == 25307 ) {
+        // Frakno utca 23
+        return pc.Color.MAGENTA;
+    } else  if (id == 25308) {
+        // Garage
+        return pc.Color.CYAN;
+    } else  if (id == 25394) {
+        // Transformer
+        return pc.Color.WHITE;
+    } else  if (id == 25395) {
+        // ELMU
+        return pc.Color.YELLOW;
+    }
+    return pc.Color.RED;
+}
 
 // Gabor
 export const fakeLocationResult = {

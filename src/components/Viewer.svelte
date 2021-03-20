@@ -23,7 +23,7 @@
         debug_appendCameraImage, debug_showLocationAxis, debug_useLocalServerResponse} from '@src/stateStore';
     import { wait, ARMODES, debounce } from "@core/common";
     import { createModel, createPlaceholder, addAxes, createObject, addLight, addLogo } from '@core/modelTemplates';
-    import { calculateDistance, fakeLocationResult, calculateEulerRotation, calculateRotation, toDegrees } from '@core/locationTools';
+    import { calculateDistance, fakeLocationResult, calculateEulerRotation, calculateRotation, toDegrees, getColorForContentId } from '@core/locationTools';
     import { initCameraCaptureScene, drawCameraCaptureScene, createImageFromTexture } from '@core/cameraCapture';
     import ArCloudOverlay from "./dom-overlays/ArCloudOverlay.svelte";
     import MarkerOverlay from "./dom-overlays/MarkerOverlay.svelte";
@@ -412,9 +412,8 @@
 
         // TODO: REMOVE, this is wrong!
         // second method, ECEF
-        // WARNING: AugmentedCity returns invalid height!
-        const cameraPosition = new LatLon(cameraGeoPose.latitude, cameraGeoPose.longitude/*, cameraGeoPose.altitude*/);
-        const objectPosition = new LatLon(objectGeoPose.latitude, objectGeoPose.longitude/*, objectGeoPose.altitude*/);
+        const cameraPosition = new LatLon(cameraGeoPose.latitude, cameraGeoPose.longitude, cameraGeoPose.altitude);
+        const objectPosition = new LatLon(objectGeoPose.latitude, objectGeoPose.longitude, objectGeoPose.altitude);
         const diff = objectPosition.toCartesian().minus(cameraPosition.toCartesian());
         console.log("diff.x: " + diff.x + ", diff.y: " + diff.y + ", diff.z: " + diff.z);
 
@@ -514,9 +513,10 @@
         console.log(test); // this should be identity matrix - OK
         */
 
-
-        let virtualCamera = createObject("box", new pc.Color(1,1,0)); // yellow
-        virtualCamera.setLocalScale(0.1, 0.2, 0.3);
+        let virtualCamera = new pc.Entity(); // This is a virtual node at the local camera pose where the photo was taken
+        let cameraBox = createObject("box", new pc.Color(1,1,0)); // yellow // this represents the camera with a model.
+        cameraBox.setLocalScale(0.1, 0.2, 0.3);
+        virtualCamera.addChild(cameraBox);
         app.root.addChild(virtualCamera);
         virtualCamera.setPosition(localPose.transform.position.x,
                                   localPose.transform.position.y,
@@ -527,6 +527,10 @@
                                   localPose.transform.orientation.w);
         // HACK: additional 90 deg rotation around forward axis
         //virtualCamera.rotateLocal(0, 0, 90); // Euler angles in degrees
+        let cam2geoTransform = new pc.Entity(); // This is a virtual node for coordinate system change
+        cam2geoTransform.setLocalPosition(0,0,0);
+        cam2geoTransform.setLocalEulerAngles(0,0,90);
+        virtualCamera.addChild(cam2geoTransform);
 
 
         let cnt = 0;
@@ -583,13 +587,15 @@
 
                 let relativePosition = getRelativeGlobalPosition(globalImagePose, globalObjectPose);
                 let relativeOrientation = getRelativeGlobalOrientation(globalImagePose, globalObjectPose);
-                
                 // WARNING: change from Geo to WebGL coordinate system: 
                 //relativePosition = convertGeo2WebVec3(relativePosition);
                 //relativeOrientation = convertGeo2WebQuat(relativeOrientation);
+                // set LOCAL transformation w.r.t parent virtualCamera
                 placeholder.setLocalPosition(relativePosition[0], relativePosition[1], relativePosition[2]); // from vec3 to Vec3
-                //placeholder.setLocalRotation(relativeOrientation[0], relativeOrientation[1], relativeOrientation[2], relativeOrientation[3]); // from quat to Quat
-                virtualCamera.addChild(placeholder);
+                placeholder.setLocalRotation(relativeOrientation[0], relativeOrientation[1], relativeOrientation[2], relativeOrientation[3]); // from quat to Quat
+                //let globalObjectOrientation = quat.fromValues(globalObjectPose.quaternion[0], globalObjectPose.quaternion[1], globalObjectPose.quaternion[2], globalObjectPose.quaternion[3])
+                //placeholder.setLocalRotation(globalObjectOrientation[0], globalObjectOrientation[1], globalObjectOrientation[2], globalObjectOrientation[3]); // from quat to Quat
+                cam2geoTransform.addChild(placeholder);
 
                 //////////////
 
@@ -693,11 +699,13 @@
 */
 
                 const material = new pc.StandardMaterial();
-                material.diffuse = pc.Color.RED;
+                material.diffuse = getColorForContentId(record.content.id);
                 material.update();
                 placeholder.model.material = material;
 
-                console.log("placeholder at: " + placeholder.getPosition().x + ", " + placeholder.getPosition().y + ", " +  placeholder.getPosition().z);
+                console.log("placeholder " + record.content.id + "\n" +
+                        "  position (" + placeholder.getPosition().x + ", " + placeholder.getPosition().y + ", " +  placeholder.getPosition().z + ") \n" +
+                        "  orientation (" + placeholder.getEulerAngles().x +  ", " + placeholder.getEulerAngles().y + ", " +  placeholder.getEulerAngles().z + ")");
                 //app.root.addChild(placeholder);
             }
         });

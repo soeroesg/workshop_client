@@ -57,7 +57,7 @@ export function addAxes(app) {
     objZ.setPosition(0, 0, 1);
     app.root.addChild(objZ);
 
-    const obj0 = createObject("box", new pc.Color(1, 0, 0));
+    const obj0 = createObject("box", new pc.Color(1, 1, 1));
     obj0.setLocalScale(0.01, 0.01, 0.01);
     obj0.setPosition(0, 0, 0);
     app.root.addChild(obj0);
