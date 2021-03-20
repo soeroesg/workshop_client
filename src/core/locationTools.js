@@ -185,6 +185,101 @@ export const fakeLocationResult = {
         "type": "geopose"
     },
     "scrs": [
+        
+        {
+            "content": {
+                "description": "",
+                "geopose": {
+                    "ecef": {
+                        "quaternion": [
+                            0.08448442637121957,
+                            0.38609012181486335,
+                            0.7667728040540936,
+                            0.5058223665485075
+                        ],
+                        "x": 4083552.3772353483,
+                        "y": 1408073.2647693662,
+                        "z": 4677090.279360294
+                    },
+                    "pose": {
+                        "altitude": 3.121204376220703,
+                        "ellipsoidHeight": -1,
+                        "latitude": 47.46792761293988,
+                        "longitude": 19.025001057084904,
+                        "quaternion": [ 
+                            0.10799239112426427,
+                            0.7162242003852406,
+                            0.11374238684059691,
+                            -0.6800170642547072,
+                        ]
+                    }
+                },
+                "id": "25307",
+                "keywords": [
+                    "other"
+                ],
+                "refs": [
+                    {
+                        "contentType": "",
+                        "url": ""
+                    }
+                ],
+                "title": "Frakno utca 23",
+                "type": "placeholder",
+                "url": ""
+            },
+            "id": "25307",
+            "tenant": "AC",
+            "timestamp": "2021-03-17T19:00:38.312116",
+            "type": "scr"
+        },
+        {
+            "content": {
+                "description": "",
+                "geopose": {
+                    "ecef": {
+                        "quaternion": [
+                            0.1295777756579727,
+                            -0.18128557774638213,
+                            0.2298757729174511,
+                            0.9473659632804511
+                        ],
+                        "x": 4083568.365709138,
+                        "y": 1408068.4946531407,
+                        "z": 4677073.177534068
+                    },
+                    "pose": {
+                        "altitude": -0.3143647015094757,
+                        "ellipsoidHeight": -1,
+                        "latitude": 47.46773375281895,
+                        "longitude": 19.024872107274113,
+                        "quaternion": [ 
+                            0.06556178784392352,
+                            -0.8326007319079958,
+                            0.5406320760395353,
+                            0.10096846813812742
+                        ]
+                    }
+                },
+                "id": "25308",
+                "keywords": [
+                    "other"
+                ],
+                "refs": [
+                    {
+                        "contentType": "",
+                        "url": ""
+                    }
+                ],
+                "title": "Garage",
+                "type": "placeholder",
+                "url": ""
+            },
+            "id": "25308",
+            "tenant": "AC",
+            "timestamp": "2021-03-17T19:00:38.511519",
+            "type": "scr"
+        },
         {
             "content": {
                 "description": "",
@@ -280,34 +375,6 @@ export const fakeLocationResult = {
             "type": "scr"
         }
     ]
-    
-        
-    //0: content: description: ""geopose: ecef: quaternion: (4) [0.08448442637121957, 0.38609012181486335, 0.7667728040540936, 0.5058223665485075]x: 4083552.3772353483y: 1408073.2647693662z: 4677090.279360294__proto__: Objectpose: altitude: 3.121204376220703ellipsoidHeight: -1latitude: 19.025001057084904longitude: 47.46792761293988quaternion: Array(4)0: 0.107992391124264271: 0.71622420038524062: 0.113742386840596913: -0.6800170642547072length: 4__proto__: Array(0)__proto__: Object__proto__: Objectid: "25307"keywords: ["text"]refs: Array(1)0: {contentType: "", url: ""}length: 1__proto__: Array(0)title: "Frakno utca 23"type: "placeholder"url: ""__proto__: Objectid: "25307"tenant: "AC"timestamp: "2021-03-17T19:00:38.312116"type: "scr"__proto__: Object
-    
-    //1: content: description: ""geopose: ecef: quaternion: Array(4)0: 0.12957777565797271: -0.181285577746382132: 0.22987577291745113: 0.9473659632804511length: 4__proto__: Array(0)x: 4083568.365709138y: 1408068.4946531407z: 4677073.177534068__proto__: Objectpose: altitude: -0.3143647015094757ellipsoidHeight: -1latitude: 19.024872107274113longitude: 47.46773375281895quaternion: Array(4)0: 0.065561787843923521: -0.83260073190799582: 0.54063207603953533: 0.10096846813812742length: 4__proto__: Array(0)__proto__: Object__proto__: Objectid: "25308"keywords: ["text"]refs: Array(1)0: {contentType: "", url: ""}length: 1__proto__: Array(0)title: "Garage"type: "placeholder"url: ""__proto__: Objectid: "25308"tenant: "AC"timestamp: "2021-03-17T19:00:38.511519"type: "scr"__proto__: Object
-    
-    /*
-    2: content: description: ""geopose: ecef: quaternion: Array(4)0: 0.398725073356590461: -0.030121948752602052: 0.8369338333111313: -0.3737014085326188length: 4__proto__: Array(0)x: 4083567.681876626y: 1408083.7531147094z: 4677070.674950173__proto__: Object
-    pose: altitude: 0.766888439655304ellipsoidHeight: -1latitude: 19.025066403025875longitude: 47.467689854053496quaternion: Array(4)0: -0.0384248598353838161: -0.2492539463782552: -0.0051641220587553533: -0.9676617729967766length: 4__proto__: Array(0)__proto__: Object__proto__: Object
-    id: "25394"keywords: Array(1)0: "other"length: 1__proto__: Array(0)refs: Array(1)0: {contentType: "", url: ""}length: 1__proto__: Array(0)
-    title: "trans2tank"type: "placeholder"url: "3dobject"__proto__: Objectid: "25394"tenant: "AC"timestamp: "2021-03-17T19:00:38.698824"type: "scr"__proto__: Object
-    */
-
-    /*
-    3: content: description: ""geopose: 
-    ecef: quaternion: Array(4)0: -0.285674463806526451: 0.183668124400380472: -0.36028777430276623: 0.8688203729747938length: 4__proto__: Array(0)x: 4083566.9818944046y: 1408064.9004089904z: 4677073.947148238__proto__: Object
-    pose: altitude: -1.42364501953125ellipsoidHeight: -1latitude: 19.024833019394446longitude: 47.46775486879815quaternion: Array(4)0: -0.052386148757221291: -0.82573312660065362: 0.077770612256525943: -0.5562123937147937length: 4__proto__: Array(0)__proto__: Object__proto__: Object
-    id: "25395"
-    keywords: ["other"]
-    refs: [{…}]
-    title: "ELMU"
-    type: "placeholder"
-    url: "www.elmu.hu"__proto__: Object
-    id: "25395"
-    tenant: "AC"
-    timestamp: "2021-03-17T19:00:38.900368"
-    type: "scr"__proto__: Objectlength: 4__proto__: Array(0)__proto__: Object
-    */
 }
 
 /**
@@ -374,10 +441,11 @@ export function calculateDistance(localisationPose, objectPose) {
 
     const xValue = centerPoint.distanceTo(lonDiff);
     const yValue = centerPoint.distanceTo(latDiff);
+    const zValue = objectPose.altitude - localisationPose.altitude; 
 
     // TODO: Add y-value when receiving valid height value from GeoPose service
     // Ground plane for geodesic values is x/y, for 3D it's x/-z
-    return {x:xValue, y:0.0, z:-yValue};
+    return {x:xValue, y:zValue, z:-yValue};
 }
 
 

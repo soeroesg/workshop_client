@@ -114,7 +114,7 @@ export function addLight(app) {
  * @param color  Color      Playcanvas color object
  * @returns {Entity}
  */
-function createObject(type, color) {
+export function createObject(type, color) {
     const entity = new pc.Entity();
     entity.addComponent("model", {type: type});
     entity.setLocalScale(0.1, 0.1, 0.1);

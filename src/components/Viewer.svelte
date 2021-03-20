@@ -23,7 +23,7 @@
         debug_appendCameraImage, debug_showLocationAxis, debug_useLocalServerResponse} from '@src/stateStore';
     import { wait, ARMODES, debounce } from "@core/common";
     import { createModel, createPlaceholder, addAxes, createObject, addLight, addLogo } from '@core/modelTemplates';
-    import { calculateDistance, fakeLocationResult, calculateEulerRotation, toDegrees } from '@core/locationTools';
+    import { calculateDistance, fakeLocationResult, calculateEulerRotation, calculateRotation, toDegrees } from '@core/locationTools';
     import { initCameraCaptureScene, drawCameraCaptureScene, createImageFromTexture } from '@core/cameraCapture';
     import ArCloudOverlay from "./dom-overlays/ArCloudOverlay.svelte";
     import MarkerOverlay from "./dom-overlays/MarkerOverlay.svelte";
@@ -142,7 +142,7 @@
             // pc.XRSPACE_UNBOUNDED
             // pc.XRSPACE_VIEWER
             // -- PlayCanvas documentation says this is for untethered VR, and for AR we should use VIEWER
-            camera.startXr(pc.XRTYPE_AR, pc.XRSPACE_LOCALFLOOR, {
+            camera.startXr(pc.XRTYPE_AR, pc.XRSPACE_UNBOUNDED, {
                 requiredFeatures: ['dom-overlay', 'camera-access'],
                 callback: onXRSessionStartedOSCP
             });
@@ -196,8 +196,8 @@
         glBinding = new XRWebGLBinding(app.xr.session, gl);
 
         app.xr.session.updateRenderState({baseLayer: new XRWebGLLayer(app.xr.session, gl)});
-        //app.xr.session.requestReferenceSpace('local').then((refSpace) => {
-            app.xr.session.requestReferenceSpace('unbounded').then((refSpace) => {
+        //app.xr.session.requestReferenceSpace('local-floor').then((refSpace) => {
+        app.xr.session.requestReferenceSpace('unbounded').then((refSpace) => {
             xrRefSpace = refSpace;
         });
 
@@ -406,7 +406,7 @@
         console.log("dx: " + dx + ", dy: " + dy + ", dz: " + dz);
 
         // TODO: Add y-value when receiving valid height value from GeoPose service
-        // WARNING: AugmentedCity returns invalid height!
+        // WARNING: AugmentedCity sometimes returns invalid height!
         // Therefore we set the dz=0
         //dz = 0.0;
 
@@ -497,27 +497,44 @@
         console.log(test); // this should be identity matrix - OK
         */
 
-
+        let cnt = 0;
         scr.forEach(record => {
             console.log("=== SCR ===========")
 
             // Augmented City special path for the GeoPose. Should be just 'record.content.geopose'
-            const objectPose = record.content.geopose.pose;
+            let objectPose = record.content.geopose.pose;
+
+
+            //HACK: line up objects
+            objectPose.quaternion[0] = 0;
+            objectPose.quaternion[1] = 0;
+            objectPose.quaternion[2] = 0;
+            objectPose.quaternion[3] = 1;
+            objectPose.latitude = globalPose.latitude - 0.0001;
+            objectPose.longitude = globalPose.longitude + 0.0001 * cnt; cnt = cnt + 1;
+            objectPose.altitude = 0;
 
             // This is difficult to generalize, because there are no types defined yet.
             if (record.content.type === 'placeholder') {
 
-                /*
                 const localPosition = localPose.transform.position;
                 const contentPosition = calculateDistance(globalPose, objectPose);
                 const placeholder = createPlaceholder(record.content.keywords);
                 placeholder.setPosition(contentPosition.x + localPosition.x,
                                         contentPosition.y + localPosition.y,
                                         contentPosition.z + localPosition.z);
+                const dRotation = calculateRotation(globalPose.quaternion, localPose.transform.orientation);
+                const rotation = quat.fromValues(dRotation[0], dRotation[2], -dRotation[1], dRotation[3]); // from Geo to WebGL axes
+                placeholder.setRotation(rotation[0], rotation[1], rotation[2], rotation[3]); // from quat to Quat
 
-                const rotation = calculateEulerRotation(globalPose.quaternion, localPose.transform.orientation);
-                placeholder.rotate(toDegrees(rotation[0]), toDegrees(rotation[1]), toDegrees(rotation[2]));
-                */
+
+
+/*
+                // rotate everything by how much the camera has rotated so far
+                let qCam = quat.create();
+                mat4.getRotation(qCam, localPose.transform.matrix);
+                placeholder.setRotation(qCam);
+*/
 
                 //////////////
 
@@ -586,7 +603,7 @@
                 */
 
                 //////////////////
-
+/*
                 const placeholder = createPlaceholder(record.content.keywords);
 
                 //placeObject(placeholder, localImagePoseMat4, globalObjectPose, globalImagePose);
@@ -619,17 +636,23 @@
                 //placeholder.setLocalRotation(localObjectOrientation;
                 //placeholder.setLocalPosition(localObjectPosition);
                 placeholder.setPosition(localObjectPosition[0], localObjectPosition[1], localObjectPosition[2]); // from vec3 to Vec3
-                placeholder.setRotation(localObjectOrientation[0], localObjectOrientation[1], localObjectOrientation[2], localObjectOrientation[3]); // from quat to Quat
+//                placeholder.setRotation(localObjectOrientation[0], localObjectOrientation[1], localObjectOrientation[2], localObjectOrientation[3]); // from quat to Quat
                 // TODO: local or global rotation??
                 //placeholder.translate(localObjectPosition);
                 //console.log("object's local transform:");
                 //console.log(placeholder.getLocalTransform());
+*/
 
-                console.log("placeholder at: " + contentPosition.x + ", " + contentPosition.y + ", " +  contentPosition.z);
+                const material = new pc.StandardMaterial();
+                material.diffuse = pc.Color.RED;
+                material.update();
+                placeholder.model.material = material;
+
+                console.log("placeholder at: " + placeholder.getPosition().x + ", " + placeholder.getPosition().y + ", " +  placeholder.getPosition().z);
                 app.root.addChild(placeholder);
             }
         });
-        
+
     }
 </script>
 
