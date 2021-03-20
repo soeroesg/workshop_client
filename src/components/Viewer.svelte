@@ -419,8 +419,26 @@
         console.log("diff.x: " + diff.x + ", diff.y: " + diff.y + ", diff.z: " + diff.z);
 
         
-        // WARNING: change of coordinate axes to match WebGL coordinate system
-        return vec3.fromValues(dx, dz, -dy);
+        // WARNING: in the next step, change of coordinate axes might be necessary to match WebGL coordinate system
+        //return vec3.fromValues(dx, dz, -dy);
+        return vec3.fromValues(dx, dy, dz);  // do not change axes yet
+    }
+
+    function convertGeo2WebVec3(geoVec3) {
+        let webVec3 = vec3.fromValues(geoVec3[0], geoVec3[2], -geoVec3[1]);
+        return webVec3;
+    }
+    function convertWeb2GeoVec3(webVec3) {
+        let geoVec3 = vec3.fromValues(webVec3[0], -webVec3[2], webVec3[1]);
+        return geoVec3;
+    }
+    function convertGeo2WebQuat(geoQuat) {
+        let webQuat = quat.fromValues(geoQuat[0], geoQuat[2], -geoQuat[1], geoQuat[3]);
+        return webQuat;
+    }
+    function convertWeb2GeoQuat(webQuat) {
+        let geoQuat = vec3.fromValues(webQuat[0], -webQuat[2], webQuat[1], webQuat[3]);
+        return geoQuat;
     }
 
     /**
@@ -453,10 +471,9 @@
         let qRel = quat.create();
         quat.multiply(qRel, qObj, qCamInv);
 
-        // WARNING: change of coordinate axes to match WebGL coordinate system
-        //return qRel; 
-        //TODO:
-        return quat.fromValues(qRel[0], qRel[2], -qRel[1], qRel[3]);
+        // WARNING: in the next step, change of coordinate axes might be necessary to match WebGL coordinate system
+        //return quat.fromValues(qRel[0], qRel[2], -qRel[1], qRel[3]);
+        return qRel; // do not change axes yet
     }
 
     // TODO: placeObject
@@ -498,7 +515,7 @@
         */
 
 
-        let virtualCamera = createObject("box", new pc.Color(1,1,0));
+        let virtualCamera = createObject("box", new pc.Color(1,1,0)); // yellow
         virtualCamera.setLocalScale(0.1, 0.2, 0.3);
         app.root.addChild(virtualCamera);
         virtualCamera.setPosition(localPose.transform.position.x,
@@ -508,10 +525,9 @@
                                   localPose.transform.orientation.y,
                                   localPose.transform.orientation.z,
                                   localPose.transform.orientation.w);
-         // HACK: additional 90 deg rotation around forward axis
-         //virtualCamera.rotateLocal(0, 0, -90); // Euler angles in degrees
+        // HACK: additional 90 deg rotation around forward axis
+        //virtualCamera.rotateLocal(0, 0, 90); // Euler angles in degrees
 
-        console.log(virtualCamera.transform);
 
         let cnt = 0;
         scr.forEach(record => {
@@ -520,18 +536,28 @@
             // Augmented City special path for the GeoPose. Should be just 'record.content.geopose'
             let objectPose = record.content.geopose.pose;
 
+            console.log("global object GeoPose:");
+            let globalObjectPose = record.content.geopose.pose;
+            console.log(globalObjectPose);
+
+            console.log("global object pose:");
+            let globalObjectPoseMat4 = convertGeoPose2PoseMat(globalObjectPose);
+            console.log(globalObjectPoseMat4);
+
 /*
             //HACK: line up objects
-            objectPose.quaternion[0] = 0;
-            objectPose.quaternion[1] = 0;
-            objectPose.quaternion[2] = 0;
-            objectPose.quaternion[3] = 1;
-            objectPose.latitude = globalPose.latitude - 0.0001;
-            objectPose.longitude = globalPose.longitude + 0.0001 * cnt; cnt = cnt + 1;
-            objectPose.altitude = 0;
+            globalObjectPose.quaternion[0] = 0;
+            globalObjectPose.quaternion[1] = 0;
+            globalObjectPose.quaternion[2] = 0;
+            globalObjectPose.quaternion[3] = 1;
+            globalObjectPose.latitude = globalPose.latitude - 0.0001;
+            globalObjectPose.longitude = globalPose.longitude + 0.0001 * cnt; cnt = cnt + 1;
+            globalObjectPose.altitude = 0;
 */
+
             // This is difficult to generalize, because there are no types defined yet.
             if (record.content.type === 'placeholder') {
+
 
 /*
                 const localPosition = localPose.transform.position;
@@ -554,17 +580,16 @@
                 //////////////
 
                 const placeholder = createPlaceholder(record.content.keywords);
+
+                let relativePosition = getRelativeGlobalPosition(globalImagePose, globalObjectPose);
+                let relativeOrientation = getRelativeGlobalOrientation(globalImagePose, globalObjectPose);
+                
+                // WARNING: change from Geo to WebGL coordinate system: 
+                //relativePosition = convertGeo2WebVec3(relativePosition);
+                //relativeOrientation = convertGeo2WebQuat(relativeOrientation);
+                placeholder.setLocalPosition(relativePosition[0], relativePosition[1], relativePosition[2]); // from vec3 to Vec3
+                //placeholder.setLocalRotation(relativeOrientation[0], relativeOrientation[1], relativeOrientation[2], relativeOrientation[3]); // from quat to Quat
                 virtualCamera.addChild(placeholder);
-
-                const contentPosition = calculateDistance(globalPose, objectPose);
-                placeholder.setLocalPosition(contentPosition.x,
-                                             contentPosition.y,
-                                             contentPosition.z);
-                const dRotation = calculateRotation(globalPose.quaternion, localPose.transform.orientation);
-                //const rotation = quat.fromValues(dRotation[0], dRotation[2], -dRotation[1], dRotation[3]); // from Geo to WebGL axes
-                const rotation = quat.fromValues(dRotation[0], dRotation[1], dRotation[2], dRotation[3]); // from Geo to WebGL axes
-                placeholder.setLocalRotation(rotation[0], rotation[1], rotation[2], rotation[3]); // from quat to Quat
-
 
                 //////////////
 
@@ -578,20 +603,14 @@
 
 
                 //NOTE: WebXR coordinate system: 
+                // right handed,
                 // X to the right
                 // Y to up
                 // Z outwards from the screen
 
                 
 
-                console.log("global object GeoPose:");
-                let globalObjectPose = record.content.geopose.pose;
-                console.log(globalObjectPose);
-
-                console.log("global object pose:");
-                let globalObjectPoseMat4 = convertGeoPose2PoseMat(globalObjectPose);
-                console.log(globalObjectPoseMat4);
-
+                
 
                 // NOTE: gl-matrix has weird notation order for operations
                 // if you want output = matrixB * matrixA, 
@@ -682,8 +701,6 @@
                 //app.root.addChild(placeholder);
             }
         });
-
-       
 
     }
 </script>
