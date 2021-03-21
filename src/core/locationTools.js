@@ -161,7 +161,7 @@ export function getColorForContentId(id) {
         return pc.Color.CYAN;
     } else  if (id == 25394) {
         // Transformer
-        return pc.Color.WHITE;
+        return pc.Color.GREEN;
     } else  if (id == 25395) {
         // ELMU
         return pc.Color.YELLOW;
@@ -483,12 +483,14 @@ export function calculateRotation(localisationQuaternion, localQuaternion) {
     const local = quat.fromValues(localQuaternion.x, localQuaternion.y, localQuaternion.z, localQuaternion.w);
 
     const localInv = quat.create();
-    quat.invert(localInv , global);
+    quat.invert(localInv , local);
 
     const diff = quat.create();
     quat.multiply(diff , global, localInv);
 
-    return diff;
+    const norm = quat.create();
+    quat.normalize(norm, diff);
+    return norm;
 }
 
 

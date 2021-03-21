@@ -269,8 +269,11 @@
 
     async function loadExistingPhoto() {
         // TODO: also read EXIF entries
-
-        let response = await fetch("/photos/IMG_20210317_095724_hdr.jpg");
+        
+        let url = "/photos/IMG_20210317_095724_hdr.jpg"; // house front from sidewards angle
+        //let url = "/photos/IMG_20210317_132655_hdr.jpg"; // from window looking down to street
+        
+        let response = await fetch(url);
         let buffer = await response.arrayBuffer();
         const imageBase64 = 'data:image/jpeg;base64,' + btoa(new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), ''));
         return imageBase64;
@@ -381,13 +384,6 @@
             }
         });
     }
-
-
-    // TODO: 
-    //DEBUG:load image from test file
-    //function loadDefaultPhoto() {
-    //    "media/IMG_20210317_095716_hdr.jpg"
-    //}
 
 
     function convertGeoPose2PoseMat(globalPose) {
@@ -511,6 +507,29 @@
      */
     function placeContent(localPose, globalPose, scr) {
         
+        // NOTE: 
+        // The GeoPose location coordinates are in Local tangent plane approximation,
+        // East-North-Up (ENU) right-handed coordinate system
+        // https://en.wikipedia.org/wiki/Local_tangent_plane_coordinates
+        // The GeoPose orientation is not in ENU, but in WebXR-compatibel coordinate system (Y up) !!!
+ 
+        // The WebXR (and PlayCanvas) coordinate system has its origin where the SLAM started,
+        // and uses a Y up right-handed coordinate system.
+
+        // We receive the GeoPose of the camera and the GeoPoses of objects, plus the local pose of the camera in the SLAM coordinate system.
+        // We want to place the objects in the SLAM coordinate system, and for that the basic idea is the following:
+        // 1. calculate the relative translation between camera and object, in Geo coordinate system
+        // 2. convert translation from Geo (right handed, Z up) to WebXR/PlayCanvas (right handed, Y up).
+        // 3. calculate the relative rotation between the camera in local and the camera in Geo coordinate system
+        // 4. create a new scene node and align it with the Geo system. This represents the camera in the Geo system.
+        // (unsure whether we need to take into account the photo's portrait/landscape orientation, and similary the UI orientation, and the camera sensor orientation)
+        // 5. We append the relative transformation between camera and object on top the camera pose in Geo system.
+        // 6. We rotate back the node to the WebGL system
+        // 7. We append the node to the local camera pose.
+
+        
+
+
         console.log('local image pose:');
         let localImagePoseMat4 = localPose.transform.matrix;
         console.log(localImagePoseMat4);
@@ -518,7 +537,6 @@
         console.log('global image GeoPose:');
         let globalImagePose = globalPose;
         console.log(globalImagePose);
-        
         /*
         console.log('global image pose:');
         let globalImagePoseMat4 = convertGeoPose2PoseMat(globalPose);
@@ -534,40 +552,47 @@
         mat4.multiply(test, globalImagePoseMat4, globalImagePoseInvMat4);
         console.log(test); // this should be identity matrix - OK
         */
+       
 
-        let virtualCamera = new pc.Entity(); // This is a virtual node at the local camera pose where the photo was taken
-        let cameraBox = createObject("box", new pc.Color(1,1,0)); // yellow // this represents the camera with a model.
-        cameraBox.setLocalScale(0.01, 0.02, 0.03);
-        virtualCamera.addChild(cameraBox);
-        app.root.addChild(virtualCamera);
-        virtualCamera.setPosition(localPose.transform.position.x,
+        let deltaRotAr2Geo = calculateRotation(globalPose.quaternion, localPose.transform.orientation); // SLAM to Geo
+        let deltaRotGeo2Ar = quat.create(); // Geo to SLAM
+        quat.invert(deltaRotGeo2Ar, deltaRotAr2Geo);
+
+
+        // We add the AR Camera for visualization
+        let arCamNode = new pc.Entity(); // This is a virtual node at the local camera pose where the photo was taken
+        app.root.addChild(arCamNode);
+        let arCamSubNode = createObject("box", new pc.Color(1,1,0, 0.5)); // yellow // this represents the camera with a model.
+        arCamSubNode.setLocalScale(0.02, 0.04, 0.06);
+        arCamNode.addChild(arCamSubNode);
+        arCamNode.setPosition(localPose.transform.position.x,
                                   localPose.transform.position.y,
                                   localPose.transform.position.z);
-        virtualCamera.setRotation(localPose.transform.orientation.x,
+        arCamNode.setRotation(localPose.transform.orientation.x,
                                   localPose.transform.orientation.y,
                                   localPose.transform.orientation.z,
                                   localPose.transform.orientation.w);
         
-        let web2geoTransformNode = new pc.Entity(); // This is a virtual node for coordinate system change
-        web2geoTransformNode.setLocalPosition(0,0,0);
-//        web2geoTransformNode.setLocalEulerAngles(0,0,90); // additional 90 deg rotation around forward axis
-        virtualCamera.addChild(web2geoTransformNode);
-        web2geoTransformNode.rotateLocal(0,-90,0);
-        
+        let geo2ArTransformNode = new pc.Entity();
+        app.root.addChild(geo2ArTransformNode);
+        geo2ArTransformNode.setPosition(0,0,0);
+        geo2ArTransformNode.setRotation(0,0,0,1);
+        geo2ArTransformNode.rotate(deltaRotAr2Geo[0], deltaRotAr2Geo[1], deltaRotAr2Geo[2], deltaRotAr2Geo[3]);
 
 
-        // DEBUG: place GeoPose of camera itself as a content entry, this should appear exactly where the picture was taken
-        const geoCam = createPlaceholder("geoCam");
-        let relativePosition = getRelativeGlobalPosition(globalImagePose, globalImagePose);
-        let relativeOrientation = getRelativeGlobalOrientation(globalImagePose, globalImagePose);        
-        geoCam.setLocalPosition(relativePosition[0], relativePosition[1], relativePosition[2]); // from vec3 to Vec3
-        geoCam.setLocalRotation(relativeOrientation[0], relativeOrientation[1], relativeOrientation[2], relativeOrientation[3]); // from quat to Quat
-        
-        web2geoTransformNode.addChild(geoCam);
+        // DEBUG: place GeoPose of camera itself as a content entry, this should appear exactly where the picture was taken, with the same orientation as the yellow arCamNode
+        const geoCamNode = createObject("box", new pc.Color(0,1,1,0.5)); // magenta
+        geoCamNode.setLocalScale(0.02, 0.04, 0.06);
+        let geoCamRelativePosition = getRelativeGlobalPosition(globalImagePose, globalImagePose);
+        geoCamRelativePosition = convertGeo2WebVec3(geoCamRelativePosition); 
+        geoCamNode.setLocalPosition(geoCamRelativePosition[0], geoCamRelativePosition[1], geoCamRelativePosition[2]); // from vec3 to Vec3
+        let geoCamOrientation = quat.fromValues(globalImagePose.quaternion[0], globalImagePose.quaternion[1], globalImagePose.quaternion[2], globalImagePose.quaternion[3])
+        geoCamNode.setLocalRotation(geoCamOrientation[0], geoCamOrientation[1], geoCamOrientation[2], geoCamOrientation[3]);
+        geo2ArTransformNode.addChild(geoCamNode);
 
 
 
-        let cnt = 0;
+        let cnt = 0; // TODO: remove if lining up the objects is not necessary anymore
         scr.forEach(record => {
             console.log("=== SCR ===========")
 
@@ -589,26 +614,35 @@
             globalObjectPose.quaternion[2] = 0;
             globalObjectPose.quaternion[3] = 1;
             globalObjectPose.latitude = globalPose.latitude - 0.0001;
-            globalObjectPose.longitude = globalPose.longitude + 0.0001 * cnt; cnt = cnt + 1;
+            globalObjectPose.longitude = globalPose.longitude + 0.0001 * cnt;
             globalObjectPose.altitude = 0;
 */
 
             // This is difficult to generalize, because there are no types defined yet.
             if (record.content.type === 'placeholder') {
 
-
 /*
-                const localPosition = localPose.transform.position;
+                const localPosition = localPose.transform.position; // camera
+                const placeholder = createPlaceholder(record.content.keywords, getColorForContentId(record.content.id));
+                app.root.addChild(placeholder);
                 const contentPosition = calculateDistance(globalPose, objectPose);
-                const placeholder = createPlaceholder(record.content.keywords);
+                //placeholder.setRotation(qObjectRotation); // the rotation returned is already in WebGL coordinate system!!!
                 placeholder.setPosition(contentPosition.x + localPosition.x,
                                         contentPosition.y + localPosition.y,
                                         contentPosition.z + localPosition.z);
                 const dRotation = calculateRotation(globalPose.quaternion, localPose.transform.orientation);
-                const rotation = quat.fromValues(dRotation[0], dRotation[2], -dRotation[1], dRotation[3]); // from Geo to WebGL axes
-                placeholder.setRotation(rotation[0], rotation[1], rotation[2], rotation[3]); // from quat to Quat
-*/
+                
+                // WARNING: axis conversion not needed, because the GeoPose respones contains the orientation in WebGL-consumable system!!!
+                //const rotation = quat.fromValues(dRotation[0], dRotation[1], dRotation[2], dRotation[3]); 
+                //const rotation = quat.fromValues(dRotation[0], dRotation[2], -dRotation[1], dRotation[3]); // from Geo to WebGL axes
+                //let qObjectRotation = pc.Quat(objectPose.quaternion[0], objectPose.quaternion[1], objectPose.quaternion[2], objectPose.quaternion[3]);
+                //qObject = pc.Quat(rotation[0], rotation[1], rotation[2], rotation[3])
+                placeholder.setRotation(dRotation);
+                //TODO: rotate a bit more with whatever is in their GeoPose orientation
+*/                
+                //////////////////////
 
+                // TODO: try this: app.root.rotate(dRotation)
 /*
                 // rotate everything by how much the camera has rotated so far
                 let qCam = quat.create();
@@ -618,18 +652,19 @@
                 //////////////
 
                 const placeholder = createPlaceholder(record.content.keywords, getColorForContentId(record.content.id));
-
+                geo2ArTransformNode.addChild(placeholder);
                 let relativePosition = getRelativeGlobalPosition(globalImagePose, globalObjectPose);
-                let relativeOrientation = getRelativeGlobalOrientation(globalImagePose, globalObjectPose);
+                //let relativeOrientation = getRelativeGlobalOrientation(globalImagePose, globalObjectPose);
                 // WARNING: change from Geo to WebGL coordinate system: 
-                //relativePosition = convertGeo2WebVec3(relativePosition);
-                //relativeOrientation = convertGeo2WebQuat(relativeOrientation);
-                // set LOCAL transformation w.r.t parent virtualCamera
+                relativePosition = convertGeo2WebVec3(relativePosition); // only convert the translation part, because the orientation is 
+                //relativeOrientation = convertGeo2WebQuat(relativeOrientation); // NOT NEEDED!
+                // set LOCAL transformation w.r.t parent arCamNode
                 placeholder.setLocalPosition(relativePosition[0], relativePosition[1], relativePosition[2]); // from vec3 to Vec3
-                placeholder.setLocalRotation(relativeOrientation[0], relativeOrientation[1], relativeOrientation[2], relativeOrientation[3]); // from quat to Quat
-                //let globalObjectOrientation = quat.fromValues(globalObjectPose.quaternion[0], globalObjectPose.quaternion[1], globalObjectPose.quaternion[2], globalObjectPose.quaternion[3])
-                //placeholder.setLocalRotation(globalObjectOrientation[0], globalObjectOrientation[1], globalObjectOrientation[2], globalObjectOrientation[3]); // from quat to Quat
-                web2geoTransformNode.addChild(placeholder);
+                //placeholder.setLocalRotation(relativeOrientation[0], relativeOrientation[1], relativeOrientation[2], relativeOrientation[3]); // from quat to Quat
+                // set the objects' orientation as in the GeoPose response, that is already in WebGL-consumable format:
+                let globalObjectOrientation = quat.fromValues(globalObjectPose.quaternion[0], globalObjectPose.quaternion[1], globalObjectPose.quaternion[2], globalObjectPose.quaternion[3])
+                placeholder.setLocalRotation(globalObjectOrientation[0], globalObjectOrientation[1], globalObjectOrientation[2], globalObjectOrientation[3]); // from quat to Quat                
+                
 
                 //////////////
 
@@ -641,16 +676,12 @@
                 // so that it is correctly oriented with respect to North direction and vertical axis and placed about WGS84
                 // ellipsoid level.
 
-
                 //NOTE: WebXR coordinate system: 
                 // right handed,
                 // X to the right
                 // Y to up
                 // Z outwards from the screen
 
-                
-
-                
 
                 // NOTE: gl-matrix has weird notation order for operations
                 // if you want output = matrixB * matrixA, 
@@ -693,10 +724,9 @@
 
                 //////////////////
 /*
+                // 
                 const placeholder = createPlaceholder(record.content.keywords);
-
-                //placeObject(placeholder, localImagePoseMat4, globalObjectPose, globalImagePose);
-
+                app.root.addChild(placeholder);
                 let relativePosition = getRelativeGlobalPosition(globalImagePose, globalObjectPose);
                 let relativeOrientation = getRelativeGlobalOrientation(globalImagePose, globalObjectPose);
                 console.log("relativePosition:");
@@ -725,19 +755,30 @@
                 //placeholder.setLocalRotation(localObjectOrientation;
                 //placeholder.setLocalPosition(localObjectPosition);
                 placeholder.setPosition(localObjectPosition[0], localObjectPosition[1], localObjectPosition[2]); // from vec3 to Vec3
-//                placeholder.setRotation(localObjectOrientation[0], localObjectOrientation[1], localObjectOrientation[2], localObjectOrientation[3]); // from quat to Quat
-                // TODO: local or global rotation??
-                //placeholder.translate(localObjectPosition);
+                placeholder.setRotation(localObjectOrientation[0], localObjectOrientation[1], localObjectOrientation[2], localObjectOrientation[3]); // from quat to Quat
                 //console.log("object's local transform:");
                 //console.log(placeholder.getLocalTransform());
 */
+                //////////////////
 
                 console.log("placeholder " + record.content.id + "\n" +
                         "  position (" + placeholder.getPosition().x + ", " + placeholder.getPosition().y + ", " +  placeholder.getPosition().z + ") \n" +
                         "  orientation (" + placeholder.getEulerAngles().x +  ", " + placeholder.getEulerAngles().y + ", " +  placeholder.getEulerAngles().z + ")");
-                //app.root.addChild(placeholder);
             }
+
+            cnt = cnt + 1;
+            console.log("Received in total " + cnt + " objects.");
+
         });
+
+
+        
+        // rotate around the origin by the rotation that brings the Geo system to the SLAM system
+        geo2ArTransformNode.rotate(deltaRotGeo2Ar[0], deltaRotGeo2Ar[1], deltaRotGeo2Ar[2], deltaRotGeo2Ar[3]);
+        // translate to the camera pose
+        geo2ArTransformNode.translate(localPose.transform.position.x,
+                                      localPose.transform.position.y,
+                                      localPose.transform.position.z);
 
     }
 </script>
