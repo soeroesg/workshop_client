@@ -226,11 +226,22 @@ debug_appendCameraImage.subscribe(value => {
  *
  * @type {Writable<boolean>}
  */
-const storedDebug_showLocationAxis = localStorage.getItem('debug_showLocationAxis') === 'true';
-export const debug_showLocationAxis = writable(storedDebug_showLocationAxis);
-debug_showLocationAxis.subscribe(value => {
-    localStorage.setItem('debug_showLocationAxis', value === true ? 'true' : 'false');
+const storedDebug_showLocalAxes = localStorage.getItem('debug_showLocalAxes') === 'true';
+export const debug_showLocalAxes = writable(storedDebug_showLocalAxes);
+debug_showLocalAxes.subscribe(value => {
+    localStorage.setItem('debug_showLocalAxes', value === true ? 'true' : 'false');
 })
+
+/**
+ * Use an existing photo (from URL or local) for the localization requests
+ *
+ * @type {Writable<boolean>}
+ */
+ const storedDebug_useExistingPhoto = localStorage.getItem('debug_useExistingPhoto') === 'true';
+ export const debug_useExistingPhoto = writable(storedDebug_useExistingPhoto);
+ debug_useExistingPhoto.subscribe(value => {
+     localStorage.setItem('debug_useExistingPhoto', value === true ? 'true' : 'false');
+ })
 
 /**
  * Use locally stored server response instead requesting it from the server.
