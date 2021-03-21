@@ -515,7 +515,7 @@
 
         let virtualCamera = new pc.Entity(); // This is a virtual node at the local camera pose where the photo was taken
         let cameraBox = createObject("box", new pc.Color(1,1,0)); // yellow // this represents the camera with a model.
-        cameraBox.setLocalScale(0.1, 0.2, 0.3);
+        cameraBox.setLocalScale(0.01, 0.02, 0.03);
         virtualCamera.addChild(cameraBox);
         app.root.addChild(virtualCamera);
         virtualCamera.setPosition(localPose.transform.position.x,
@@ -525,12 +525,24 @@
                                   localPose.transform.orientation.y,
                                   localPose.transform.orientation.z,
                                   localPose.transform.orientation.w);
-        // HACK: additional 90 deg rotation around forward axis
-        //virtualCamera.rotateLocal(0, 0, 90); // Euler angles in degrees
-        let cam2geoTransform = new pc.Entity(); // This is a virtual node for coordinate system change
-        cam2geoTransform.setLocalPosition(0,0,0);
-        cam2geoTransform.setLocalEulerAngles(0,0,90);
-        virtualCamera.addChild(cam2geoTransform);
+        
+        let web2geoTransformNode = new pc.Entity(); // This is a virtual node for coordinate system change
+        web2geoTransformNode.setLocalPosition(0,0,0);
+//        web2geoTransformNode.setLocalEulerAngles(0,0,90); // additional 90 deg rotation around forward axis
+        virtualCamera.addChild(web2geoTransformNode);
+        web2geoTransformNode.rotateLocal(0,-90,0);
+        
+
+
+        // DEBUG: place GeoPose of camera itself as a content entry, this should appear exactly where the picture was taken
+        const geoCam = createPlaceholder("geoCam");
+        let relativePosition = getRelativeGlobalPosition(globalImagePose, globalImagePose);
+        let relativeOrientation = getRelativeGlobalOrientation(globalImagePose, globalImagePose);        
+        geoCam.setLocalPosition(relativePosition[0], relativePosition[1], relativePosition[2]); // from vec3 to Vec3
+        geoCam.setLocalRotation(relativeOrientation[0], relativeOrientation[1], relativeOrientation[2], relativeOrientation[3]); // from quat to Quat
+        
+        web2geoTransformNode.addChild(geoCam);
+
 
 
         let cnt = 0;
@@ -583,7 +595,7 @@
 */
                 //////////////
 
-                const placeholder = createPlaceholder(record.content.keywords);
+                const placeholder = createPlaceholder(record.content.keywords, getColorForContentId(record.content.id));
 
                 let relativePosition = getRelativeGlobalPosition(globalImagePose, globalObjectPose);
                 let relativeOrientation = getRelativeGlobalOrientation(globalImagePose, globalObjectPose);
@@ -595,7 +607,7 @@
                 placeholder.setLocalRotation(relativeOrientation[0], relativeOrientation[1], relativeOrientation[2], relativeOrientation[3]); // from quat to Quat
                 //let globalObjectOrientation = quat.fromValues(globalObjectPose.quaternion[0], globalObjectPose.quaternion[1], globalObjectPose.quaternion[2], globalObjectPose.quaternion[3])
                 //placeholder.setLocalRotation(globalObjectOrientation[0], globalObjectOrientation[1], globalObjectOrientation[2], globalObjectOrientation[3]); // from quat to Quat
-                cam2geoTransform.addChild(placeholder);
+                web2geoTransformNode.addChild(placeholder);
 
                 //////////////
 
@@ -697,11 +709,6 @@
                 //console.log("object's local transform:");
                 //console.log(placeholder.getLocalTransform());
 */
-
-                const material = new pc.StandardMaterial();
-                material.diffuse = getColorForContentId(record.content.id);
-                material.update();
-                placeholder.model.material = material;
 
                 console.log("placeholder " + record.content.id + "\n" +
                         "  position (" + placeholder.getPosition().x + ", " + placeholder.getPosition().y + ", " +  placeholder.getPosition().z + ") \n" +

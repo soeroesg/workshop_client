@@ -28,10 +28,15 @@ export function createModel() {
  * @param keywords      string, provided by a call to a Spatial Content Discovery server
  * @returns {Entity}
  */
-export function createPlaceholder(keywords) {
+export function createPlaceholder(keywords, color=pc.Color.WHITE) {
     const placeholder = new pc.Entity();
     placeholder.addComponent('model', {type: 'box'});
     placeholder.setLocalScale(0.1, 0.2, 0.3);
+    const material = new pc.StandardMaterial();
+    material.diffuse = color;
+    material.update();
+    placeholder.model.material = material;
+
     return placeholder;
 }
 
