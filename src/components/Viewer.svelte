@@ -18,7 +18,7 @@
     import { IMAGEFORMAT } from 'gpp-access/GppGlobals.js';
 
     import { initialLocation, availableContentServices, currentMarkerImage,
-        currentMarkerImageWidth, recentLocalisation,
+        currentMarkerImageWidth, recentLocalisation, imageDataBase64,
         debug_appendCameraImage, debug_showLocationAxis, debug_useLocalServerResponse} from '@src/stateStore';
     import { wait, ARMODES, debounce } from "@core/common";
     import { createModel, createPlaceholder, addAxes } from '@core/modelTemplates';
@@ -276,9 +276,17 @@
                 doCaptureImage = false;
 
                 // TODO: try to queue the camera capture code on XRSession.requestAnimationFrame()
+                // TODO: set ImageOrientation in the request
+                // EXIF orientation values are listed here: https://www.impulseadventure.com/photo/exif-orientation.html
 
-                const image = createImageFromTexture(gl, cameraTexture, viewport.width, viewport.height);
+                let image = createImageFromTexture(gl, cameraTexture, viewport.width, viewport.height);
                 
+                if (1) {
+                    //getDefaultImage();
+                    loadDefaultPhoto();
+                    image = imageDataBase64;
+                }
+
                 if ($debug_appendCameraImage) {
                     // DEBUG: verify if the image was captured correctly
                     const img = new Image();
@@ -313,7 +321,7 @@
         return new Promise((resolve, reject) => {
             if (!$debug_useLocalServerResponse) {
                 const geoPoseRequest = new GeoPoseRequest(uuidv4())
-                    .addCameraData(IMAGEFORMAT.JPG, [width, height], image.split(',')[1], 0, new ImageOrientation(false, 0))
+                    .addCameraData(IMAGEFORMAT.JPG, [width, height], image.split(',')[1], 0, new ImageOrientation(false, 1))
                     .addLocationData($initialLocation.lat, $initialLocation.lon, 0, 0, 0, 0, 0);
 
                 // Services haven't implemented recent changes to the protocol yet
@@ -344,6 +352,26 @@
             }
         });
     }
+
+    function getDefaultImage() {
+        fetch("/photos/IMG_20210317_132655_hdr.jpg")
+            .then(response => response.arrayBuffer())
+            .then(buffer => {
+                imageDataBase64.set('data:image/jpeg;base64,' + btoa(new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')));
+                //preview.src = $imageDataBase64;
+                //filename = 'seattle.jpg';
+            }).then(imageDataBase64 =>{
+                return imageDataBase64;
+            });      
+        
+    }
+
+   async function loadDefaultPhoto() {
+        let response = await fetch("/photos/IMG_20210317_132655_hdr.jpg");
+        let buffer = response.arrayBuffer();
+        imageDataBase64.set('data:image/jpeg;base64,' + btoa(new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')));
+    }
+
 
     /**
      *  Places the content provided by a call to a Spacial Content Discovery server.

@@ -242,3 +242,6 @@ export const debug_useLocalServerResponse = writable(storedDebug_useLocalServerR
 debug_useLocalServerResponse.subscribe(value => {
     localStorage.setItem('debug_useLocalServerResponse', value === true ? 'true' : 'false');
 })
+
+
+export const imageDataBase64 = writable('');
