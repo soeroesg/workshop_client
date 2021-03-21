@@ -14,7 +14,7 @@
     import { showDashboard, initialLocation, availableGeoPoseServices, availableContentServices,
         availableP2pServices, selectedGeoPoseService, selectedContentService, selectedP2pService, arMode,
         currentMarkerImage, currentMarkerImageWidth, recentLocalisation, debug_appendCameraImage,
-        debug_showLocationAxis, debug_useLocalServerResponse, allowP2pNetwork, p2pNetworkState
+        debug_showLocalAxes, debug_useExistingPhoto, debug_useLocalServerResponse, allowP2pNetwork, p2pNetworkState
         } from '@src/stateStore';
 
     import { ARMODES } from '@core/common';
@@ -142,8 +142,13 @@
 </div>
 
 <div>
-    <input id="showlocationaxis" type="checkbox" bind:checked={$debug_showLocationAxis} />
-    <label for="showlocationaxis">Show local zero point markers</label>
+    <input id="useexistingphoto" type="checkbox" bind:checked={$debug_useExistingPhoto} />
+    <label for="useexistingphoto">Use existing photo</label>
+</div>
+
+<div>
+    <input id="showlocalaxes" type="checkbox" bind:checked={$debug_showLocalAxes} />
+    <label for="showlocalaxes">Show local coordinate axes</label>
 </div>
 
 <div>

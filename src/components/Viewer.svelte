@@ -18,8 +18,8 @@
     import { IMAGEFORMAT } from 'gpp-access/GppGlobals.js';
 
     import { initialLocation, availableContentServices, currentMarkerImage,
-        currentMarkerImageWidth, recentLocalisation, imageDataBase64,
-        debug_appendCameraImage, debug_showLocationAxis, debug_useLocalServerResponse} from '@src/stateStore';
+        currentMarkerImageWidth, recentLocalisation,
+        debug_appendCameraImage, debug_showLocalAxes, debug_useExistingPhoto, debug_useLocalServerResponse} from '@src/stateStore';
     import { wait, ARMODES, debounce } from "@core/common";
     import { createModel, createPlaceholder, addAxes } from '@core/modelTemplates';
     import { calculateDistance, fakeLocationResult, calculateEulerRotation, toDegrees } from '@core/locationTools';
@@ -46,6 +46,8 @@
     let xrRefSpace = null, gl = null, glBinding = null;
     let trackedImage, trackedImageObject;
     let poseFoundHeartbeat = null;
+
+    let existingPhoto = null; // A photo that we can load from file or a URL for testing the localization service. TOTO: spceify URL on the Dashboard
 
 
     /**
@@ -91,6 +93,7 @@
         window.addEventListener("resize", () => {
             if (app) app.resizeCanvas(canvas.width, canvas.height);
         });
+
     }
 
     /**
@@ -115,7 +118,7 @@
         light.translate(0, 10, 0);
         app.root.addChild(light);
 
-        if ($debug_showLocationAxis) {
+        if ($debug_showLocalAxes) {
             addAxes(app);
         }
 
@@ -193,7 +196,11 @@
     /**
      * Trigger localisation of the device globally using a GeoPose service.
      */
-    function startLocalisation() {
+    async function startLocalisation() {
+        if ($debug_useExistingPhoto) {
+            existingPhoto = await loadExistingPhoto();
+        }
+
         doCaptureImage = true;
         isLocalizing = true;
     }
@@ -217,7 +224,7 @@
             }
         }
     }
-
+    
     /**
      * Handles a pose found heartbeat. When it's not triggered for a specific time (300ms as default) an indicator
      * is shown to let the user know that the tracking was lost.
@@ -244,6 +251,15 @@
             trackedImageObject.setPosition(trackedImage.getPosition());
             trackedImageObject.setRotation(trackedImage.getRotation());
         }
+    }
+
+    async function loadExistingPhoto() {
+        // TODO: also read EXIF entries
+
+        let response = await fetch("/photos/IMG_20210317_095724_hdr.jpg");
+        let buffer = await response.arrayBuffer();
+        const imageBase64 = 'data:image/jpeg;base64,' + btoa(new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+        return imageBase64;
     }
 
     /**
@@ -281,14 +297,12 @@
 
                 let image = createImageFromTexture(gl, cameraTexture, viewport.width, viewport.height);
                 
-                if (1) {
-                    //getDefaultImage();
-                    loadDefaultPhoto();
-                    image = imageDataBase64;
+                if ($debug_useExistingPhoto) {
+                    image = existingPhoto; // overwrite image with existing photo
                 }
 
                 if ($debug_appendCameraImage) {
-                    // DEBUG: verify if the image was captured correctly
+                    // DEBUG: see whether the image was captured correctly, append it to the dashboard
                     const img = new Image();
                     img.src = image;
                     document.body.appendChild(img);
@@ -352,26 +366,6 @@
             }
         });
     }
-
-    function getDefaultImage() {
-        fetch("/photos/IMG_20210317_132655_hdr.jpg")
-            .then(response => response.arrayBuffer())
-            .then(buffer => {
-                imageDataBase64.set('data:image/jpeg;base64,' + btoa(new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')));
-                //preview.src = $imageDataBase64;
-                //filename = 'seattle.jpg';
-            }).then(imageDataBase64 =>{
-                return imageDataBase64;
-            });      
-        
-    }
-
-   async function loadDefaultPhoto() {
-        let response = await fetch("/photos/IMG_20210317_132655_hdr.jpg");
-        let buffer = response.arrayBuffer();
-        imageDataBase64.set('data:image/jpeg;base64,' + btoa(new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')));
-    }
-
 
     /**
      *  Places the content provided by a call to a Spacial Content Discovery server.
