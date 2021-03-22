@@ -353,7 +353,7 @@
         return new Promise((resolve, reject) => {
             if (!$debug_useLocalServerResponse) {
                 const geoPoseRequest = new GeoPoseRequest(uuidv4())
-                    .addCameraData(IMAGEFORMAT.JPG, [width, height], image.split(',')[1], 0, new ImageOrientation(false, 1))
+                    .addCameraData(IMAGEFORMAT.JPG, [width, height], image.split(',')[1], 0, new ImageOrientation(false, 0))
                     .addLocationData($initialLocation.lat, $initialLocation.lon, 0, 0, 0, 0, 0);
 
                 // Services haven't implemented recent changes to the protocol yet
@@ -364,6 +364,18 @@
                         isLocalizing = false;
                         isLocalized = true;
                         wait(1000).then(showFooter = false);
+
+                        /*
+                        // TODO: handle localization failure from AC, an example fail answer is this:
+                        {
+                            "code": 550,
+                            "id": "9089876676575754",
+                            "timestamp": "2021-03-22 01:57:09.249796",
+                            "type": "geopose",
+                            "name": "Localization error",
+                            "description": "Fail to localize image"
+                        }
+                        */
 
                         if ('scrs' in data) {
                             resolve([data.geopose.pose, data.scrs]);
