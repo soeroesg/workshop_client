@@ -59,7 +59,7 @@
      */
     $: {
         if (firstPoseReceived) {
-            if ($debug_showLocationAxis) {
+            if ($debug_showLocalAxes) {
                 // TODO: Don't provide app to function. Return objects and add them here to the scene
                 addAxes(app);
             }
@@ -672,7 +672,7 @@
         scr.forEach(record => {
             console.log("=== SCR ===========")
 
-
+            const localPosition = localPose.transform.position; // camera
             const container = new pc.Entity();
             container.setPosition(localPosition.x, localPosition.y, localPosition.z);
             app.root.addChild(container);
@@ -704,7 +704,6 @@
 
                 /*
                 //Michael's version
-                const localPosition = localPose.transform.position; // camera
                 const placeholder = createPlaceholder(record.content.keywords);
                 container.addChild(placeholder);
                 const contentPosition = calculateDistance(globalPose, objectPose);
