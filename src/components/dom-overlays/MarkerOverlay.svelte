@@ -3,10 +3,31 @@
   This code is licensed under MIT license (see LICENSE for details)
 -->
 
-<!-- DOM-overlay on top of AR canvas AR mode is marker -->
+<!--
+    Content of the marker intro overlay.
+-->
+
 <script>
-    import { pointMarkerMessage } from '@src/contentStore';
+    import { createEventDispatcher } from 'svelte';
+
+    import { markerInfo, startedOkLabel } from "@src/contentStore";
+
+    // Used to dispatch events to parent
+    const dispatch = createEventDispatcher();
 </script>
 
 
-<p>{$pointMarkerMessage}</p>
+<style>
+    button {
+        width: var(--button-width);
+        height: var(--button-height);
+        border-radius: var(--ui-radius);
+    }
+</style>
+
+
+<div>{@html $markerInfo}</div>
+
+<footer>
+        <button on:click={() => dispatch('okAction')}>{$startedOkLabel}</button>
+</footer>

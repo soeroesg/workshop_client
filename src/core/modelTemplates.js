@@ -120,6 +120,8 @@ export function addLight(app) {
  * @returns {Entity}
  */
 export function createObject(type, color) {
+    // TODO: use createModel instead
+
     const entity = new pc.Entity();
     entity.addComponent("model", {type: type});
     entity.setLocalScale(0.1, 0.1, 0.1);

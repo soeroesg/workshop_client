@@ -9,8 +9,7 @@
 <script>
     import { createEventDispatcher } from 'svelte';
 
-    
-    import '@thirdparty/playcanvas.min.js';
+    import '@thirdparty/playcanvas.dbg.js';
     import {v4 as uuidv4} from 'uuid';
 
     import { sendRequest, objectEndpoint, validateRequest } from 'gpp-access';
@@ -22,11 +21,11 @@
         currentMarkerImageWidth, recentLocalisation,
         debug_appendCameraImage, debug_showLocalAxes, debug_useExistingPhoto, debug_useLocalServerResponse} from '@src/stateStore';
     import { wait, ARMODES, debounce } from "@core/common";
-    import { createModel, createPlaceholder, addAxes, createObject, addLight, addLogo } from '@core/modelTemplates';
-    import { calculateDistance, fakeLocationResult, calculateEulerRotation, calculateRotation, toDegrees, getColorForContentId } from '@core/locationTools';
+    import { createModel, createPlaceholder, addAxes, createObject } from '@core/modelTemplates';
+    import { calculateDistance, fakeLocationResult, calculateRotation, getColorForContentId } from '@core/locationTools';
     import { initCameraCaptureScene, drawCameraCaptureScene, createImageFromTexture } from '@core/cameraCapture';
-    import ArCloudOverlay from "./dom-overlays/ArCloudOverlay.svelte";
-    import MarkerOverlay from "./dom-overlays/MarkerOverlay.svelte";
+    import ArCloudOverlay from "@components/dom-overlays/ArCloudOverlay.svelte";
+    import ArMarkerOverlay from "@components/dom-overlays/ArMarkerOverlay.svelte";
 
     import {mat4, vec4, mat3, vec3, quat} from 'gl-matrix';
     import LatLon from 'geodesy/latlon-ellipsoidal-vincenty.js';
@@ -45,13 +44,27 @@
     let app;
 
     let doCaptureImage = false;
-    let showFooter = false, hasPose = false, isLocalizing = false, isLocalized = false, hasLostTracking = false;
+    let showFooter = false, firstPoseReceived = false, isLocalizing = false, isLocalized = false, hasLostTracking = false;
 
     let xrRefSpace = null, gl = null, glBinding = null;
     let trackedImage, trackedImageObject;
     let poseFoundHeartbeat = null;
 
     let existingPhoto = null; // A photo that we can load from file or a URL for testing the localization service. TOTO: spceify URL on the Dashboard
+    // TODO: Setup event target array, based on info received from SCD
+
+
+    /**
+     * Setup default content of scene that should be created when WebXR reports the first successful pose
+     */
+    $: {
+        if (firstPoseReceived) {
+            if ($debug_showLocationAxis) {
+                // TODO: Don't provide app to function. Return objects and add them here to the scene
+                addAxes(app);
+            }
+        }
+    }
 
 
     /**
@@ -83,6 +96,7 @@
             message("Immersive AR session has ended");
 
             app = null;
+            firstPoseReceived = false;
             dispatch('arSessionEnded');
         });
 
@@ -104,7 +118,6 @@
      * Set up the 3D environment as required according to the current real environment.*
      */
     function setupEnvironment() {
-        // TODO: Use environmental lighting?!
 
         // create camera
         const camera = new pc.Entity();
@@ -133,6 +146,16 @@
 
         return camera.camera;
     }
+
+    /**
+     * Receives data from the application to be applied to current scene.
+     */
+    export function updateReceived(data) {
+        console.log('viewer update received');
+
+        // TODO: Set the data to the respective objects
+    }
+
 
     /**
      * Setup required AR features and start the XRSession.
@@ -231,7 +254,7 @@
             handlePoseHeartbeat();
 
             if (activeArMode === ARMODES.oscp) {
-                hasPose = true;
+                firstPoseReceived = true;
                 handlePose(localPose, frame);
             } else if (activeArMode === ARMODES.marker) {
                 handleMarker();
@@ -294,7 +317,7 @@
         for (let view of localPose.views) {
             let viewport = app.xr.session.renderState.baseLayer.getViewport(view);
             gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
-            
+
             // NOTE: if we do not draw anything on pose update for more than 5 frames, Chrome's WebXR sends warnings
             // See OnFrameEnd() in https://chromium.googlesource.com/chromium/src/third_party/+/master/blink/renderer/modules/xr/xr_webgl_layer.cc
 
@@ -365,7 +388,7 @@
                     .then(data => {
                         isLocalizing = false;
                         isLocalized = true;
-                        wait(1000).then(showFooter = false);
+                        wait(1000).then(() => showFooter = false);
 
                         /*
                         // TODO: handle localization failure from AC, an example fail answer is this:
@@ -649,6 +672,11 @@
         scr.forEach(record => {
             console.log("=== SCR ===========")
 
+
+            const container = new pc.Entity();
+            container.setPosition(localPosition.x, localPosition.y, localPosition.z);
+            app.root.addChild(container);
+
             // Augmented City special path for the GeoPose. Should be just 'record.content.geopose'
             let objectPose = record.content.geopose.pose;
 
@@ -674,28 +702,25 @@
             // This is difficult to generalize, because there are no types defined yet.
             if (record.content.type === 'placeholder') {
 
-/*
+                /*
+                //Michael's version
                 const localPosition = localPose.transform.position; // camera
-                const placeholder = createPlaceholder(record.content.keywords, getColorForContentId(record.content.id));
-                app.root.addChild(placeholder);
+                const placeholder = createPlaceholder(record.content.keywords);
+                container.addChild(placeholder);
                 const contentPosition = calculateDistance(globalPose, objectPose);
-                //placeholder.setRotation(qObjectRotation); // the rotation returned is already in WebGL coordinate system!!!
                 placeholder.setPosition(contentPosition.x + localPosition.x,
                                         contentPosition.y + localPosition.y,
                                         contentPosition.z + localPosition.z);
-                const dRotation = calculateRotation(globalPose.quaternion, localPose.transform.orientation);
-                
                 // WARNING: axis conversion not needed, because the GeoPose respones contains the orientation in WebGL-consumable system!!!
-                //const rotation = quat.fromValues(dRotation[0], dRotation[1], dRotation[2], dRotation[3]); 
-                //const rotation = quat.fromValues(dRotation[0], dRotation[2], -dRotation[1], dRotation[3]); // from Geo to WebGL axes
-                //let qObjectRotation = pc.Quat(objectPose.quaternion[0], objectPose.quaternion[1], objectPose.quaternion[2], objectPose.quaternion[3]);
-                //qObject = pc.Quat(rotation[0], rotation[1], rotation[2], rotation[3])
-                placeholder.setRotation(dRotation);
+                const rotation = calculateRotation(globalPose.quaternion, localPose.transform.orientation);
+                container.setRotation(rotation[0], rotation[1], rotation[2], rotation[3]);
+                console.log("placeholder at: " + contentPosition.x + ", " + contentPosition.y + ", " +  contentPosition.z);
+                */
                 //TODO: rotate a bit more with whatever is in their GeoPose orientation
-*/                
+                //let qObjectRotation = pc.Quat(objectPose.quaternion[0], objectPose.quaternion[1], objectPose.quaternion[2], objectPose.quaternion[3]);
+
                 //////////////////////
 
-                // TODO: try this: app.root.rotate(dRotation)
 /*
                 // rotate everything by how much the camera has rotated so far
                 let qCam = quat.create();
@@ -853,25 +878,24 @@
 
 
 <style>
-    canvas {
-        width: 100vw;
-        height: 100vh;
-    }
-
     aside footer {
         position: absolute;
         bottom: 0;
 
         margin: var(--ui-margin);
-        padding: var(--ui-margin);
+        padding: 0 27px;
 
         width: calc(100vw - 4 * var(--ui-margin));
 
         border: 1px solid black;
         border-radius: var(--ui-radius);
-        background-color: white;
-
+        font-size: 16px;
+        font-weight: bold;
         text-align: center;
+
+        background: #FFFFFF 0% 0% no-repeat padding-box;
+
+        opacity: 0.7;
     }
 
     #trackinglostindicator {
@@ -890,22 +914,24 @@
 
 
 <canvas id='application' bind:this={canvas}></canvas>
+
 <aside bind:this={overlay} on:beforexrselect={(event) => event.preventDefault()}>
-    {#if showFooter || hasLostTracking}
+    <!--  Space for UI elements  -->
+    {#if showFooter}
         <footer>
             {#if activeArMode === ARMODES.oscp}
-                <ArCloudOverlay hasPose="{hasPose}" isLocalizing="{isLocalizing}" isLocalized="{isLocalized}"
+                <ArCloudOverlay hasPose="{firstPoseReceived}" isLocalizing="{isLocalizing}" isLocalized="{isLocalized}"
                         on:startLocalisation={startLocalisation} />
             {:else if activeArMode === ARMODES.marker}
-                <MarkerOverlay />
+                <ArMarkerOverlay />
             {:else}
                 <p>Somethings wrong...</p>
                 <p>Apologies.</p>
             {/if}
-
-            {#if hasLostTracking}
-                <div id="trackinglostindicator"></div>
-            {/if}
         </footer>
+    {/if}
+
+    {#if hasLostTracking}
+        <div id="trackinglostindicator"></div>
     {/if}
 </aside>

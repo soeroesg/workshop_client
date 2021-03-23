@@ -483,10 +483,10 @@ export function calculateRotation(localisationQuaternion, localQuaternion) {
     const local = quat.fromValues(localQuaternion.x, localQuaternion.y, localQuaternion.z, localQuaternion.w);
 
     const localInv = quat.create();
-    quat.invert(localInv , local);
+    quat.invert(localInv, local);
 
     const diff = quat.create();
-    quat.multiply(diff , global, localInv);
+    quat.multiply(diff, global, localInv);
 
     const norm = quat.create();
     quat.normalize(norm, diff);
