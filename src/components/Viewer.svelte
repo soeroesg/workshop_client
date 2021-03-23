@@ -270,9 +270,10 @@
     async function loadExistingPhoto() {
         // TODO: also read EXIF entries
         
-        //let url = "/photos/IMG_20210317_095724_hdr.jpg"; // house front from sidewards angle
-        //let url = "/photos/IMG_20210317_132655_hdr.jpg"; // from window looking down to street
-        let url = "/photos/IMG_20210321_161405.jpg"; // looking roughly towards North, slightly up
+        let url = "/photos/IMG_20210317_095724_hdr.jpg"; // looking at house front from the right side from sidewards angle, landscape
+        //let url = "/photos/IMG_20210317_132655_hdr_small.jpg"; // from window looking down to street, landscape
+        //let url = "/photos/IMG_20210321_161405_small.jpg"; // looking roughly towards North, slightly up
+        //let url = "/photos/IMG_20210317_095716_hdr_small.jpg"; // looking at house front from the right side from sidewards angle, portrait
         
         let response = await fetch(url);
         let buffer = await response.arrayBuffer();
@@ -440,18 +441,10 @@
         // WARNING: AugmentedCity sometimes returns invalid height!
         // Therefore we set the dz=0
         //dz = 0.0;
-
-        // TODO: REMOVE, this is wrong!
-        // second method, ECEF
-        const cameraPosition = new LatLon(cameraGeoPose.latitude, cameraGeoPose.longitude, cameraGeoPose.altitude);
-        const objectPosition = new LatLon(objectGeoPose.latitude, objectGeoPose.longitude, objectGeoPose.altitude);
-        const diff = objectPosition.toCartesian().minus(cameraPosition.toCartesian());
-        console.log("diff.x: " + diff.x + ", diff.y: " + diff.y + ", diff.z: " + diff.z);
-
         
         // WARNING: in the next step, change of coordinate axes might be necessary to match WebGL coordinate system
         //return vec3.fromValues(dx, dz, -dy);
-        return vec3.fromValues(dx, dy, dz);  // do not change axes yet
+        return vec3.fromValues(dx, dy, dz); // do not change axes yet
     }
 
     function convertGeo2WebVec3(geoVec3) {
@@ -552,7 +545,7 @@
         // We want to place the objects in the SLAM coordinate system, and for that the basic idea is the following:
         // 1. calculate the relative translation between camera and object, in Geo coordinate system
         // 2. convert translation from Geo (right handed, Z up) to WebXR/PlayCanvas (right handed, Y up).
-        // 3. calculate the relative rotation between the camera in local and the camera in Geo coordinate system
+        // 3. calculate the relative rotation between the camera in local and the camera in Geo coordinate system (Both are given in WebGL coordinate system!)
         // 4. create a new scene node and align it with the Geo system. This represents the camera in the Geo system.
         // (unsure whether we need to take into account the photo's portrait/landscape orientation, and similary the UI orientation, and the camera sensor orientation)
         // 5. We append the relative transformation between camera and object on top the camera pose in Geo system.
@@ -560,12 +553,13 @@
         // 7. We append the node to the local camera pose.
 
         
+        /*
         /// HACK DEBUG: delete gobal rotation, so that the blue camera box is aligned with the geo axes:
         globalPose.quaternion[0]=0;
         globalPose.quaternion[1]=0;
         globalPose.quaternion[2]=0;
         globalPose.quaternion[3]=1;
-        
+        */
 
 
         console.log('local image pose:');
@@ -590,6 +584,10 @@
         mat4.multiply(test, globalImagePoseMat4, globalImagePoseInvMat4);
         console.log(test); // this should be identity matrix - OK
         */
+
+        printQuat("local camera orientation", localPose.transform.orientation.x, localPose.transform.orientation.y, localPose.transform.orientation.z, localPose.transform.orientation.w);
+        printQuat("global camera orientation", globalPose.quaternion[0], globalPose.quaternion[1], globalPose.quaternion[2], globalPose.quaternion[3]); // DO NOT SWAP axes
+
        
         // TODO: better name: deltaRotArInGeo, or slamOrientationInGeo
         let deltaRotAr2Geo = calculateRotation(globalPose.quaternion, localPose.transform.orientation); // SLAM to Geo
@@ -601,9 +599,10 @@
         printQuat("deltaRotGeo2Ar", deltaRotGeo2Ar[0], deltaRotGeo2Ar[1], deltaRotGeo2Ar[2], deltaRotGeo2Ar[3]);
 
         // We add the AR Camera for visualization
+        // this represents the camera in the SLAM coordinate system
         let arCamNode = new pc.Entity(); // This is a virtual node at the local camera pose where the photo was taken
         app.root.addChild(arCamNode);
-        let arCamSubNode = createObject("box", new pc.Color(1,1,0, 0.5)); // yellow // this represents the camera with a model.
+        let arCamSubNode = createObject("box", new pc.Color(1,1,0, 0.5)); // yellow
         arCamSubNode.setLocalScale(0.02, 0.04, 0.06);
         arCamSubNode.setLocalPosition(0.001, 0.001, 0.001);
         arCamNode.addChild(arCamSubNode);
@@ -619,19 +618,30 @@
         app.root.addChild(geo2ArTransformNode);
         geo2ArTransformNode.setPosition(0,0,0);
         geo2ArTransformNode.setRotation(0,0,0,1);
-        geo2ArTransformNode.rotate(deltaRotAr2Geo[0], deltaRotAr2Geo[1], deltaRotAr2Geo[2], deltaRotAr2Geo[3]);
+//geo2ArTransformNode.setRotation(deltaRotAr2Geo[0], deltaRotAr2Geo[1], deltaRotAr2Geo[2], deltaRotAr2Geo[3]);
 
 
-        // DEBUG: place GeoPose of camera itself as a content entry, this should appear exactly where the picture was taken, with the same orientation as the yellow arCamNode
-        const geoCamNode = createObject("box", new pc.Color(0,1,1,0.5)); // magenta
+        // DEBUG: place GeoPose of camera as a content entry with full orientation
+        // this should appear exactly where the picture was taken, with the same orientation of the camera in the world
+        const geoCamNode = createObject("box", new pc.Color(0,1,1,0.5)); // cyan
         geo2ArTransformNode.addChild(geoCamNode);
         geoCamNode.setLocalScale(0.02, 0.04, 0.06);
-        let geoCamRelativePosition = getRelativeGlobalPosition(globalImagePose, globalImagePose);
+        let geoCamRelativePosition = getRelativeGlobalPosition(globalImagePose, globalImagePose); // will be (0,0,0)
         geoCamRelativePosition = convertGeo2WebVec3(geoCamRelativePosition); // convert from Geo to SLAM
         geoCamNode.setLocalPosition(geoCamRelativePosition[0], geoCamRelativePosition[1], geoCamRelativePosition[2]); // from vec3 to Vec3
         let geoCamOrientation = quat.fromValues(globalImagePose.quaternion[0], globalImagePose.quaternion[1], globalImagePose.quaternion[2], globalImagePose.quaternion[3]);
         geoCamNode.setLocalRotation(geoCamOrientation[0], geoCamOrientation[1], geoCamOrientation[2], geoCamOrientation[3]);
         
+
+        // DEBUG: place GeoPose of camera as a content entry with zero orientation
+        // this should appear exactly where the picture was taken, with the same orientation as the yellow arCamNode
+        let geoCoordinateSystemNode = createObject("box", new pc.Color(1,1,1,0.5)); // white
+        geo2ArTransformNode.addChild(geoCoordinateSystemNode);
+        geoCoordinateSystemNode.setLocalScale(0.02, 0.04, 0.06);
+        let geoCoordinateSystemRelativePosition = getRelativeGlobalPosition(globalImagePose, globalImagePose); // will be (0,0,0)
+        geoCoordinateSystemRelativePosition = convertGeo2WebVec3(geoCoordinateSystemRelativePosition); // convert from Geo to SLAM
+        geoCoordinateSystemNode.setLocalPosition(geoCoordinateSystemRelativePosition[0], geoCoordinateSystemRelativePosition[1], geoCoordinateSystemRelativePosition[2]); // from vec3 to Vec3
+        geoCoordinateSystemNode.setLocalRotation(0,0,0,1);
 
 
 
@@ -650,8 +660,8 @@
             let globalObjectPoseMat4 = convertGeoPose2PoseMat(globalObjectPose);
             console.log(globalObjectPoseMat4);
 
-
-            //HACK: line up objects to the right
+            
+            //HACK: line up objects a bit North from us along a line towards East.
             globalObjectPose.quaternion[0] = 0;
             globalObjectPose.quaternion[1] = 0;
             globalObjectPose.quaternion[2] = 0;
@@ -704,7 +714,7 @@
                 //relativeOrientation = convertGeo2WebQuat(relativeOrientation); // NOT NEEDED!
                 // set LOCAL transformation w.r.t parent geo2ArTransformNode
                 placeholder.setLocalPosition(relativePosition[0], relativePosition[1], relativePosition[2]); // from vec3 to Vec3
-                //placeholder.setLocalRotation(relativeOrientation[0], relativeOrientation[1], relativeOrientation[2], relativeOrientation[3]); // from quat to Quat
+                //placeholder.setLocalRotation(relativeOrientation[0], relativeOrientation[1], relativeOrientation[2], relativeOrientation[3]); // THIS IS WRONG // from quat to Quat
                 // set the objects' orientation as in the GeoPose response, that is already in WebGL-consumable format:
                 let globalObjectOrientation = quat.fromValues(globalObjectPose.quaternion[0], globalObjectPose.quaternion[1], globalObjectPose.quaternion[2], globalObjectPose.quaternion[3])
                 placeholder.setLocalRotation(globalObjectOrientation[0], globalObjectOrientation[1], globalObjectOrientation[2], globalObjectOrientation[3]); // from quat to Quat                
@@ -816,11 +826,21 @@
         });
 
 
+        // rotate around the origin by the rotation that brings the SLAM system to the Geo system
+        let QCur = geo2ArTransformNode.getRotation(); // Quat
+        printQuat("QCur", QCur.x, QCur.y, QCur.z, QCur.w);
+        let qCur = quat.fromValues(QCur.x, QCur.y, QCur.z, QCur.w);
+        let qNew = quat.create();
+
+        // SWAP AXES of relative rotation (that we calculated in Geo system) from Geo to SLAM
+        //let alignment = quat.fromValues(deltaRotAr2Geo[0], deltaRotAr2Geo[2], -deltaRotAr2Geo[1], deltaRotAr2Geo[3]);
+        //let alignment = quat.fromValues(deltaRotGeo2Ar[0], -deltaRotGeo2Ar[2], deltaRotGeo2Ar[1], deltaRotGeo2Ar[3]); // ??
+        // NO NEED TO SWAP AXES! Quaternions are all in the WebGL space!!!
+        let alignment = quat.fromValues(deltaRotGeo2Ar[0], deltaRotGeo2Ar[1], deltaRotGeo2Ar[2], deltaRotGeo2Ar[3]); // NO SWAP!!!
+        quat.multiply(qNew, alignment, qCur);
+        geo2ArTransformNode.setRotation(qNew[0], qNew[1], qNew[2], qNew[3]); // from quat to Quat
         
-        // rotate around the origin by the rotation that brings the Geo system to the SLAM system
-        geo2ArTransformNode.rotate(deltaRotGeo2Ar[0], deltaRotGeo2Ar[1], deltaRotGeo2Ar[2], deltaRotGeo2Ar[3]);
-        // translate to the camera pose
-         // translate to the camera pose, because we know the position of the objects relative to the camera
+        // translate to the camera position, because we know the position of all the objects only relative to the camera
         geo2ArTransformNode.translate(localPose.transform.position.x,
                                       localPose.transform.position.y,
                                       localPose.transform.position.z);
