@@ -270,8 +270,9 @@
     async function loadExistingPhoto() {
         // TODO: also read EXIF entries
         
-        let url = "/photos/IMG_20210317_095724_hdr.jpg"; // house front from sidewards angle
+        //let url = "/photos/IMG_20210317_095724_hdr.jpg"; // house front from sidewards angle
         //let url = "/photos/IMG_20210317_132655_hdr.jpg"; // from window looking down to street
+        let url = "/photos/IMG_20210321_161405.jpg"; // looking roughly towards North, slightly up
         
         let response = await fetch(url);
         let buffer = await response.arrayBuffer();
@@ -469,6 +470,25 @@
         let geoQuat = vec3.fromValues(webQuat[0], -webQuat[2], webQuat[1], webQuat[3]);
         return geoQuat;
     }
+    function printQuat(name, x, y, z, w) {
+        // With PlayCanvas Quat
+        let qQuat = new pc.Quat(x, y, z, w);
+        let qEuler = new pc.Vec3();
+        qQuat.getEulerAngles(qEuler);
+        console.log(name + ":")
+        console.log("  Euler angles: " + qEuler.toString());
+        let axis = new pc.Vec3()
+        let angle = qQuat.getAxisAngle(axis);
+        console.log("  axis: " + axis.toString());
+        console.log("  angle: " + angle);
+
+        // With gl-matrix quat
+        //let qqat = quat.fromValues(x,y,z,w);
+        //let axis = vec3.create();
+        //let angle = quat.getAxisAngle(axis, qqat);
+        //console.log("axis: " + vec3.str(axis));
+        //console.log("angle: " + angle);
+    }
 
     /**
     *  Calculates the relative orientation of two geodesic locations.
@@ -540,6 +560,12 @@
         // 7. We append the node to the local camera pose.
 
         
+        /// HACK DEBUG: delete gobal rotation, so that the blue camera box is aligned with the geo axes:
+        globalPose.quaternion[0]=0;
+        globalPose.quaternion[1]=0;
+        globalPose.quaternion[2]=0;
+        globalPose.quaternion[3]=1;
+        
 
 
         console.log('local image pose:');
@@ -565,17 +591,21 @@
         console.log(test); // this should be identity matrix - OK
         */
        
-
+        // TODO: better name: deltaRotArInGeo, or slamOrientationInGeo
         let deltaRotAr2Geo = calculateRotation(globalPose.quaternion, localPose.transform.orientation); // SLAM to Geo
         let deltaRotGeo2Ar = quat.create(); // Geo to SLAM
         quat.invert(deltaRotGeo2Ar, deltaRotAr2Geo);
 
+        // DEBUG
+        printQuat("deltaRotAr2Geo", deltaRotAr2Geo[0], deltaRotAr2Geo[1], deltaRotAr2Geo[2], deltaRotAr2Geo[3]);
+        printQuat("deltaRotGeo2Ar", deltaRotGeo2Ar[0], deltaRotGeo2Ar[1], deltaRotGeo2Ar[2], deltaRotGeo2Ar[3]);
 
         // We add the AR Camera for visualization
         let arCamNode = new pc.Entity(); // This is a virtual node at the local camera pose where the photo was taken
         app.root.addChild(arCamNode);
         let arCamSubNode = createObject("box", new pc.Color(1,1,0, 0.5)); // yellow // this represents the camera with a model.
         arCamSubNode.setLocalScale(0.02, 0.04, 0.06);
+        arCamSubNode.setLocalPosition(0.001, 0.001, 0.001);
         arCamNode.addChild(arCamSubNode);
         arCamNode.setPosition(localPose.transform.position.x,
                                   localPose.transform.position.y,
@@ -594,13 +624,14 @@
 
         // DEBUG: place GeoPose of camera itself as a content entry, this should appear exactly where the picture was taken, with the same orientation as the yellow arCamNode
         const geoCamNode = createObject("box", new pc.Color(0,1,1,0.5)); // magenta
+        geo2ArTransformNode.addChild(geoCamNode);
         geoCamNode.setLocalScale(0.02, 0.04, 0.06);
         let geoCamRelativePosition = getRelativeGlobalPosition(globalImagePose, globalImagePose);
-        geoCamRelativePosition = convertGeo2WebVec3(geoCamRelativePosition); 
+        geoCamRelativePosition = convertGeo2WebVec3(geoCamRelativePosition); // convert from Geo to SLAM
         geoCamNode.setLocalPosition(geoCamRelativePosition[0], geoCamRelativePosition[1], geoCamRelativePosition[2]); // from vec3 to Vec3
-        let geoCamOrientation = quat.fromValues(globalImagePose.quaternion[0], globalImagePose.quaternion[1], globalImagePose.quaternion[2], globalImagePose.quaternion[3])
+        let geoCamOrientation = quat.fromValues(globalImagePose.quaternion[0], globalImagePose.quaternion[1], globalImagePose.quaternion[2], globalImagePose.quaternion[3]);
         geoCamNode.setLocalRotation(geoCamOrientation[0], geoCamOrientation[1], geoCamOrientation[2], geoCamOrientation[3]);
-        geo2ArTransformNode.addChild(geoCamNode);
+        
 
 
 
@@ -619,16 +650,16 @@
             let globalObjectPoseMat4 = convertGeoPose2PoseMat(globalObjectPose);
             console.log(globalObjectPoseMat4);
 
-/*
-            //HACK: line up objects
+
+            //HACK: line up objects to the right
             globalObjectPose.quaternion[0] = 0;
             globalObjectPose.quaternion[1] = 0;
             globalObjectPose.quaternion[2] = 0;
             globalObjectPose.quaternion[3] = 1;
-            globalObjectPose.latitude = globalPose.latitude - 0.0001;
-            globalObjectPose.longitude = globalPose.longitude + 0.0001 * cnt;
-            globalObjectPose.altitude = 0;
-*/
+            globalObjectPose.latitude = globalPose.latitude + 0.0001;
+            globalObjectPose.longitude = globalPose.longitude + 0.0001 * (cnt);
+            globalObjectPose.altitude = globalPose.altitude;
+
 
             // This is difficult to generalize, because there are no types defined yet.
             if (record.content.type === 'placeholder') {
@@ -667,10 +698,11 @@
                 geo2ArTransformNode.addChild(placeholder);
                 let relativePosition = getRelativeGlobalPosition(globalImagePose, globalObjectPose);
                 //let relativeOrientation = getRelativeGlobalOrientation(globalImagePose, globalObjectPose);
-                // WARNING: change from Geo to WebGL coordinate system: 
-                relativePosition = convertGeo2WebVec3(relativePosition); // only convert the translation part, because the orientation is 
+                // WARNING: change from Geo to WebGL coordinate system:
+                // only convert the translation part, because the orientation is already in WebGL coordinate system
+                relativePosition = convertGeo2WebVec3(relativePosition);
                 //relativeOrientation = convertGeo2WebQuat(relativeOrientation); // NOT NEEDED!
-                // set LOCAL transformation w.r.t parent arCamNode
+                // set LOCAL transformation w.r.t parent geo2ArTransformNode
                 placeholder.setLocalPosition(relativePosition[0], relativePosition[1], relativePosition[2]); // from vec3 to Vec3
                 //placeholder.setLocalRotation(relativeOrientation[0], relativeOrientation[1], relativeOrientation[2], relativeOrientation[3]); // from quat to Quat
                 // set the objects' orientation as in the GeoPose response, that is already in WebGL-consumable format:
@@ -788,10 +820,14 @@
         // rotate around the origin by the rotation that brings the Geo system to the SLAM system
         geo2ArTransformNode.rotate(deltaRotGeo2Ar[0], deltaRotGeo2Ar[1], deltaRotGeo2Ar[2], deltaRotGeo2Ar[3]);
         // translate to the camera pose
+         // translate to the camera pose, because we know the position of the objects relative to the camera
         geo2ArTransformNode.translate(localPose.transform.position.x,
                                       localPose.transform.position.y,
                                       localPose.transform.position.z);
 
+        console.log("geo2ArTransformNode:");
+        printQuat("  rotation:", geo2ArTransformNode.getRotation().x, geo2ArTransformNode.getRotation().y, geo2ArTransformNode.getRotation().z, geo2ArTransformNode.getRotation().w);
+        console.log("  position: ", geo2ArTransformNode.getPosition().x, geo2ArTransformNode.getPosition().y, geo2ArTransformNode.getPosition().z);
     }
 </script>
 
