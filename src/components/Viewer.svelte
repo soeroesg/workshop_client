@@ -336,6 +336,9 @@
                 // TODO: try to queue the camera capture code on XRSession.requestAnimationFrame()
                 // TODO: set ImageOrientation in the request
                 // EXIF orientation values are listed here: https://www.impulseadventure.com/photo/exif-orientation.html
+                // NOTE from Sergey:
+                // The "ImageOrientation" field is used now in the OSCP geopose protocol.
+                // You should use integer values [0,90,180,270] - сlockwise camera rotation, according to the usual mobile sensor. The output camera pose should depend on it.
 
                 let image = createImageFromTexture(gl, cameraTexture, viewport.width, viewport.height);
                 
@@ -845,9 +848,8 @@
             }
 
             cnt = cnt + 1;
-            console.log("Received in total " + cnt + " objects.");
-
         });
+        console.log("Received in total " + cnt + " objects.");
 
 
         // rotate around the origin by the rotation that brings the SLAM system to the Geo system
