@@ -59,6 +59,7 @@ export function drawCameraCaptureScene(gl, cameraTexture) {
     // We need to save the previous shader ID and restore it at the end, 
     // otherwise PlayCanvas will cry
     const prevShaderId = gl.getParameter(gl.CURRENT_PROGRAM);
+    const prevTextureId = gl.getParameter(gl.TEXTURE_BINDING_2D);
 
     gl.useProgram(shaderProgram);
 
@@ -75,8 +76,9 @@ export function drawCameraCaptureScene(gl, cameraTexture) {
     // Draw the single point
     gl.drawArrays(gl.POINTS, 0, 1);
 
-    // Restore the previous shader
+    // Restore the previous shader and texture
     gl.useProgram(prevShaderId);
+    gl.bindTexture(gl.TEXTURE_2D, prevTextureId);
 }
 
 
