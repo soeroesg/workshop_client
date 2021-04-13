@@ -19,7 +19,7 @@
 
     import { initialLocation, availableContentServices, currentMarkerImage,
         currentMarkerImageWidth, recentLocalisation,
-        debug_appendCameraImage, debug_showLocalAxes, debug_useExistingPhoto, debug_useLocalServerResponse} from '@src/stateStore';
+        debug_appendCameraImage, debug_showLocalAxes, debug_useExistingPhoto, debug_useLocalServerResponse, debug_useLocationIndependentObjects } from '@src/stateStore';
     import { wait, ARMODES, debounce } from "@core/common";
     import { createModel, createPlaceholder, addAxes, createObject } from '@core/modelTemplates';
     import { calculateDistance, fakeLocationResult, calculateRotation, getColorForContentId } from '@core/locationTools';
@@ -692,14 +692,16 @@
             console.log(globalObjectPoseMat4);
 
             
-            //HACK: line up objects a bit North from us along a line towards East.
-            globalObjectPose.quaternion[0] = 0;
-            globalObjectPose.quaternion[1] = 0;
-            globalObjectPose.quaternion[2] = 0;
-            globalObjectPose.quaternion[3] = 1;
-            globalObjectPose.latitude = globalPose.latitude + 0.0001;
-            globalObjectPose.longitude = globalPose.longitude + 0.0001 * (cnt);
-            globalObjectPose.altitude = globalPose.altitude;
+            if($debug_useLocationIndependentObjects) {
+                //HACK: line up objects a bit North from us along a line towards East.
+                globalObjectPose.quaternion[0] = 0;
+                globalObjectPose.quaternion[1] = 0;
+                globalObjectPose.quaternion[2] = 0;
+                globalObjectPose.quaternion[3] = 1;
+                globalObjectPose.latitude = globalPose.latitude + 0.0001;
+                globalObjectPose.longitude = globalPose.longitude + 0.0001 * (cnt);
+                globalObjectPose.altitude = globalPose.altitude;
+            }
 
 
             // This is difficult to generalize, because there are no types defined yet.

@@ -14,7 +14,8 @@
     import { showDashboard, initialLocation, availableGeoPoseServices, availableContentServices,
         availableP2pServices, selectedGeoPoseService, selectedContentService, selectedP2pService, arMode,
         currentMarkerImage, currentMarkerImageWidth, recentLocalisation, debug_appendCameraImage,
-        debug_showLocalAxes, debug_useExistingPhoto, debug_useLocalServerResponse, allowP2pNetwork, p2pNetworkState
+        debug_showLocalAxes, debug_useExistingPhoto, debug_useLocalServerResponse, debug_useLocationIndependentObjects,
+        allowP2pNetwork, p2pNetworkState
         } from '@src/stateStore';
 
     import { ARMODES } from '@core/common';
@@ -277,5 +278,9 @@
     <label for="uselocalserverresponse">Use local server response</label>
 </div>
 
+<div>
+    <input id="uselocationindependentobjects" type="checkbox" bind:checked={$debug_useLocationIndependentObjects} />
+    <label for="uselocationindependentobjects">Use location-independent obects</label>
+</div>
 
 {@html supportedCountries}

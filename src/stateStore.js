@@ -243,6 +243,17 @@ debug_showLocalAxes.subscribe(value => {
      localStorage.setItem('debug_useExistingPhoto', value === true ? 'true' : 'false');
  })
 
+ /**
+ * Use an existing photo (from URL or local) for the localization requests
+ *
+ * @type {Writable<boolean>}
+ */
+  const storedDebug_useLocationIndependentObjects = localStorage.getItem('debug_useLocationIndependentObjects') === 'true';
+  export const debug_useLocationIndependentObjects = writable(storedDebug_useLocationIndependentObjects);
+  debug_useLocationIndependentObjects.subscribe(value => {
+      localStorage.setItem('debug_useLocationIndependentObjects', value === true ? 'true' : 'false');
+  })
+
 /**
  * Use locally stored server response instead requesting it from the server.
  *
