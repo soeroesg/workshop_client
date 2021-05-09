@@ -22,7 +22,8 @@
         debug_appendCameraImage, debug_showLocalAxes, debug_useExistingPhoto, debug_useLocalServerResponse, debug_useLocationIndependentObjects } from '@src/stateStore';
     import { wait, ARMODES, debounce } from "@core/common";
     import { createModel, createPlaceholder, addAxes, createObject } from '@core/modelTemplates';
-    import { calculateDistance, fakeLocationResult, calculateRotation, getColorForContentId } from '@core/locationTools';
+    import { printQuat, calculateDistance, calculateRotation, getRelativeGlobalPosition, convertGeoPose2PoseMat, convertGeo2WebVec3, convertAugmentedCity2WebQuat } from '@core/locationTools';
+    import { fakeLocationResult, fakeLocationResult2, getColorForContentId } from '@core/devTools';
     import { initCameraCaptureScene, drawCameraCaptureScene, createImageFromTexture } from '@core/cameraCapture';
     import ArCloudOverlay from "@components/dom-overlays/ArCloudOverlay.svelte";
     import ArMarkerOverlay from "@components/dom-overlays/ArMarkerOverlay.svelte";
@@ -293,8 +294,8 @@
     async function loadExistingPhoto() {
         // TODO: also read EXIF entries
         
-        let url = "/photos/IMG_20210317_095724_hdr.jpg"; // looking at house front from the right side from sidewards angle, landscape
-        //let url = "/photos/IMG_20210317_132655_hdr_small.jpg"; // from window looking down to street, landscape
+        //let url = "/photos/IMG_20210317_095724_hdr.jpg"; // looking at house front from the right side from sidewards angle, landscape
+        let url = "/photos/IMG_20210317_132655_hdr_small.jpg"; // from window looking down to street, landscape
         //let url = "/photos/IMG_20210321_161405_small.jpg"; // looking roughly towards North, slightly up
         //let url = "/photos/IMG_20210317_095716_hdr_small.jpg"; // looking at house front from the right side from sidewards angle, portrait
         
@@ -420,128 +421,15 @@
                 console.log('fake localisation');
                 isLocalized = true;
                 wait(1000).then(showFooter = false);  // TODO: resolve AFTER the 1sec? .then()
+
+                /*// OLD AugmentedCity API
                 resolve([fakeLocationResult.geopose.pose, fakeLocationResult.scrs])
+                */
+                // NEW AugmentedCity API
+                //resolve([fakeLocationResult2.geopose.pose, fakeLocationResult2.scrs])
+                resolve([fakeLocationResult2.geopose.pose, fakeLocationResult2.scrs])
             }
         });
-    }
-
-
-    function convertGeoPose2PoseMat(globalPose) {
-        // WARNING: AugmentedCity returns incorrect altitude! So we assume here that we are on the Earth surface.
-        //let globalPositionLatLon = new LatLon(globalPose.latitude, globalPose.longitude, globalPose.altitude);
-        let globalPositionLatLon = new LatLon(globalPose.latitude, globalPose.longitude);
-
-        let globalPositionCartesian = globalPositionLatLon.toCartesian();
-        let globalPositionVec3 = vec3.fromValues(globalPositionCartesian.x, globalPositionCartesian.y, globalPositionCartesian.z);
-        //console.log(globalPositionVec3);
-        let globalOrientationArray = globalPose.quaternion;
-        let globalOrientationQuat = quat.fromValues(globalOrientationArray[0], globalOrientationArray[1], globalOrientationArray[2], globalOrientationArray[3]);
-        //console.log(globalOrientationQuat);
-        let globalPoseMat4 = mat4.create();
-        mat4.fromRotationTranslation(globalPoseMat4, globalOrientationQuat, globalPositionVec3);
-        //console.log(globalPoseMat4);
-        return globalPoseMat4;
-    }
-
-    /**
-    *  Calculates the relative position of two geodesic locations.
-    *
-    *  Used to calculate the relative distance between the device at the moment of localization and the
-    *  location of an object received from a content discovery service.
-    *
-    * @param cameraGeoPose  GeoPose of the camera returned by the localization service
-    * @param objectGeoPose  GeoPose of an object
-    * @returns vec3         Relative position of the object with respect to the camera
-    */ 
-    function getRelativeGlobalPosition(cameraGeoPose, objectGeoPose) {
-        // first method, Geo
-        const cam = new LatLon(cameraGeoPose.latitude, cameraGeoPose.longitude);
-        const cam2objLat = new LatLon(objectGeoPose.latitude, cameraGeoPose.longitude);
-        const cam2objLon = new LatLon(cameraGeoPose.latitude, objectGeoPose.longitude);
-        const dx = cam.distanceTo(cam2objLon);
-        const dy = cam.distanceTo(cam2objLat);
-        let dz = objectGeoPose.altitude - cameraGeoPose.altitude; 
-        console.log("dx: " + dx + ", dy: " + dy + ", dz: " + dz);
-
-        // TODO: Add y-value when receiving valid height value from GeoPose service
-        // WARNING: AugmentedCity sometimes returns invalid height!
-        // Therefore we set the dz=0
-        //dz = 0.0;
-        
-        // WARNING: in the next step, change of coordinate axes might be necessary to match WebGL coordinate system
-        //return vec3.fromValues(dx, dz, -dy);
-        return vec3.fromValues(dx, dy, dz); // do not change axes yet
-    }
-
-    function convertGeo2WebVec3(geoVec3) {
-        let webVec3 = vec3.fromValues(geoVec3[0], geoVec3[2], -geoVec3[1]);
-        return webVec3;
-    }
-    function convertWeb2GeoVec3(webVec3) {
-        let geoVec3 = vec3.fromValues(webVec3[0], -webVec3[2], webVec3[1]);
-        return geoVec3;
-    }
-    function convertGeo2WebQuat(geoQuat) {
-        let webQuat = quat.fromValues(geoQuat[0], geoQuat[2], -geoQuat[1], geoQuat[3]);
-        return webQuat;
-    }
-    function convertWeb2GeoQuat(webQuat) {
-        let geoQuat = vec3.fromValues(webQuat[0], -webQuat[2], webQuat[1], webQuat[3]);
-        return geoQuat;
-    }
-    function printQuat(name, x, y, z, w) {
-        // With PlayCanvas Quat
-        let qQuat = new pc.Quat(x, y, z, w);
-        let qEuler = new pc.Vec3();
-        qQuat.getEulerAngles(qEuler);
-        console.log(name + ":")
-        console.log("  Euler angles: " + qEuler.toString());
-        let axis = new pc.Vec3()
-        let angle = qQuat.getAxisAngle(axis);
-        console.log("  axis: " + axis.toString());
-        console.log("  angle: " + angle);
-
-        // With gl-matrix quat
-        //let qqat = quat.fromValues(x,y,z,w);
-        //let axis = vec3.create();
-        //let angle = quat.getAxisAngle(axis, qqat);
-        //console.log("axis: " + vec3.str(axis));
-        //console.log("angle: " + angle);
-    }
-
-    /**
-    *  Calculates the relative orientation of two geodesic locations.
-    *
-    *  Used to calculate the relative orientation between the device at the moment of localization and the
-    *  location of an object received from a content discovery service.
-    *
-    * @param cameraGeoPose  GeoPose of the camera returned by the localization service
-    * @param objectGeoPose  GeoPose of an object
-    * @returns quat         Relative orientation of the object with respect to the camera
-    */ 
-    function getRelativeGlobalOrientation(cameraGeoPose, objectGeoPose) {
-        // camera orientation
-        const qCam = quat.fromValues(
-                cameraGeoPose.quaternion[0],
-                cameraGeoPose.quaternion[1],
-                cameraGeoPose.quaternion[2],
-                cameraGeoPose.quaternion[3]);
-        // object orientation
-        const qObj = quat.fromValues(
-                objectGeoPose.quaternion[0],
-                objectGeoPose.quaternion[1],
-                objectGeoPose.quaternion[2],
-                objectGeoPose.quaternion[3]);
-
-        // NOTE: if q2 = qdiff * q1, then  qdiff = q2 * inverse(q1)
-        let qCamInv = quat.create();
-        quat.invert(qCamInv, qCam); 
-        let qRel = quat.create();
-        quat.multiply(qRel, qObj, qCamInv);
-
-        // WARNING: in the next step, change of coordinate axes might be necessary to match WebGL coordinate system
-        //return quat.fromValues(qRel[0], qRel[2], -qRel[1], qRel[3]);
-        return qRel; // do not change axes yet
     }
 
     // TODO: placeObject
@@ -611,12 +499,25 @@
         console.log(test); // this should be identity matrix - OK
         */
 
+
+        /*// OLD AugmentedCity API
+        let globalImagePoseQuaternion = quat.fromValues(globalPose.quaternion[0], 
+                                                        globalPose.quaternion[1],
+                                                        globalPose.quaternion[2],
+                                                        globalPose.quaternion[3]);
+        */
+        // NEW AugmentedCity API:
+        let globalImagePoseQuaternion = quat.fromValues(globalPose.quaternion.x, 
+                                                        globalPose.quaternion.y,
+                                                        globalPose.quaternion.z,
+                                                        globalPose.quaternion.w);
+
         printQuat("local camera orientation", localPose.transform.orientation.x, localPose.transform.orientation.y, localPose.transform.orientation.z, localPose.transform.orientation.w);
-        printQuat("global camera orientation", globalPose.quaternion[0], globalPose.quaternion[1], globalPose.quaternion[2], globalPose.quaternion[3]); // DO NOT SWAP axes
+        printQuat("global camera orientation", globalImagePoseQuaternion[0], globalImagePoseQuaternion[1], globalImagePoseQuaternion[2], globalImagePoseQuaternion[3]); // DO NOT SWAP axes
 
        
         // TODO: better name: deltaRotArInGeo, or slamOrientationInGeo
-        let deltaRotAr2Geo = calculateRotation(globalPose.quaternion, localPose.transform.orientation); // SLAM to Geo
+        let deltaRotAr2Geo = calculateRotation(globalImagePoseQuaternion, localPose.transform.orientation); // SLAM to Geo
         let deltaRotGeo2Ar = quat.create(); // Geo to SLAM
         quat.invert(deltaRotGeo2Ar, deltaRotAr2Geo);
 
@@ -633,12 +534,12 @@
         arCamSubNode.setLocalPosition(0.001, 0.001, 0.001);
         arCamNode.addChild(arCamSubNode);
         arCamNode.setPosition(localPose.transform.position.x,
-                                  localPose.transform.position.y,
-                                  localPose.transform.position.z);
+                              localPose.transform.position.y,
+                              localPose.transform.position.z);
         arCamNode.setRotation(localPose.transform.orientation.x,
-                                  localPose.transform.orientation.y,
-                                  localPose.transform.orientation.z,
-                                  localPose.transform.orientation.w);
+                              localPose.transform.orientation.y,
+                              localPose.transform.orientation.z,
+                              localPose.transform.orientation.w);
         
         let geo2ArTransformNode = new pc.Entity();
         app.root.addChild(geo2ArTransformNode);
@@ -655,7 +556,7 @@
         let geoCamRelativePosition = getRelativeGlobalPosition(globalImagePose, globalImagePose); // will be (0,0,0)
         geoCamRelativePosition = convertGeo2WebVec3(geoCamRelativePosition); // convert from Geo to SLAM
         geoCamNode.setLocalPosition(geoCamRelativePosition[0], geoCamRelativePosition[1], geoCamRelativePosition[2]); // from vec3 to Vec3
-        let geoCamOrientation = quat.fromValues(globalImagePose.quaternion[0], globalImagePose.quaternion[1], globalImagePose.quaternion[2], globalImagePose.quaternion[3]);
+        let geoCamOrientation = quat.fromValues(globalImagePoseQuaternion[0], globalImagePoseQuaternion[1], globalImagePoseQuaternion[2], globalImagePoseQuaternion[3]);
         geoCamNode.setLocalRotation(geoCamOrientation[0], geoCamOrientation[1], geoCamOrientation[2], geoCamOrientation[3]);
         
 
@@ -684,7 +585,20 @@
             let objectPose = record.content.geopose.pose;
 
             console.log("global object GeoPose:");
+            /*// OLD AugmentedCity API
             let globalObjectPose = record.content.geopose.pose;
+            let globalObjectPoseQuaternion = quat.fromValues(globalObjectPose.quaternion[0], 
+                                                             globalObjectPose.quaternion[1],
+                                                             globalObjectPose.quaternion[2],
+                                                             globalObjectPose.quaternion[3]);
+            */
+            // NEW AugmentedCity API:
+            let globalObjectPose = record.content.geopose;
+            let globalObjectPoseQuaternion = quat.fromValues(globalObjectPose.quaternion.x, 
+                                                             globalObjectPose.quaternion.y,
+                                                             globalObjectPose.quaternion.z,
+                                                             globalObjectPose.quaternion.w);
+          
             console.log(globalObjectPose);
 
             console.log("global object pose:");
@@ -694,13 +608,14 @@
             
             if($debug_useLocationIndependentObjects) {
                 //HACK: line up objects a bit North from us along a line towards East.
-                globalObjectPose.quaternion[0] = 0;
-                globalObjectPose.quaternion[1] = 0;
-                globalObjectPose.quaternion[2] = 0;
-                globalObjectPose.quaternion[3] = 1;
+                globalObjectPoseQuaternion[0] = 0;
+                globalObjectPoseQuaternion[1] = 0;
+                globalObjectPoseQuaternion[2] = 0;
+                globalObjectPoseQuaternion[3] = 1;
                 globalObjectPose.latitude = globalPose.latitude + 0.0001;
                 globalObjectPose.longitude = globalPose.longitude + 0.0001 * (cnt);
                 globalObjectPose.altitude = globalPose.altitude;
+                globalObjectPose.ellipsoidHeight = globalPose.ellipsoidHeight;
             }
 
 
@@ -716,7 +631,7 @@
                                         contentPosition.y + localPosition.y,
                                         contentPosition.z + localPosition.z);
                 // WARNING: axis conversion not needed, because the GeoPose respones contains the orientation in WebGL-consumable system!!!
-                const rotation = calculateRotation(globalPose.quaternion, localPose.transform.orientation);
+                const rotation = calculateRotation(globalImagePoseQuaternion, localPose.transform.orientation);
                 container.setRotation(rotation[0], rotation[1], rotation[2], rotation[3]);
                 console.log("placeholder at: " + contentPosition.x + ", " + contentPosition.y + ", " +  contentPosition.z);
                 */
@@ -745,7 +660,10 @@
                 placeholder.setLocalPosition(relativePosition[0], relativePosition[1], relativePosition[2]); // from vec3 to Vec3
                 //placeholder.setLocalRotation(relativeOrientation[0], relativeOrientation[1], relativeOrientation[2], relativeOrientation[3]); // THIS IS WRONG // from quat to Quat
                 // set the objects' orientation as in the GeoPose response, that is already in WebGL-consumable format:
-                let globalObjectOrientation = quat.fromValues(globalObjectPose.quaternion[0], globalObjectPose.quaternion[1], globalObjectPose.quaternion[2], globalObjectPose.quaternion[3])
+                let globalObjectOrientation = quat.fromValues(globalObjectPoseQuaternion[0],
+                                                              globalObjectPoseQuaternion[1], 
+                                                              globalObjectPoseQuaternion[2],
+                                                              globalObjectPoseQuaternion[3]);
                 placeholder.setLocalRotation(globalObjectOrientation[0], globalObjectOrientation[1], globalObjectOrientation[2], globalObjectOrientation[3]); // from quat to Quat                
                 
 
