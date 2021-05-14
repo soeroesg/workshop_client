@@ -228,6 +228,21 @@ export function convertWeb2GeoQuat(webQuat) {
     return geoQuat;
 }
 
+export function convertAugmentedCity2WebQuat(acQuat) {
+    // WebXR: X to the right, Y up, Z backwards
+    // AugmentedCity ENU: X forward, Y to the left, Z up
+    let webQuat = quat.fromValues(-acQuat[1], acQuat[2], -acQuat[0], acQuat[3]);
+    //return webQuat; // this is how it should be according Sergey's drawings. Almost good, but still missing a +90deg rotation around UP axis
+
+
+    // Additional +90 degrees rotation around the UP axis is missing. 
+    let rotY90 = quat.create();
+    quat.fromEuler(rotY90,0,-90,0); // TODO: why negative angle is needed here to make it work correct?
+    quat.multiply(webQuat, rotY90, webQuat);
+
+    return webQuat;
+}
+
 export function convertGeoPose2PoseMat(globalPose) {
     // WARNING: AugmentedCity returns incorrect altitude! So we assume here that we are on the Earth surface.
     //let globalPositionLatLon = new LatLon(globalPose.latitude, globalPose.longitude, globalPose.altitude);

@@ -22,7 +22,8 @@
         debug_appendCameraImage, debug_showLocalAxes, debug_useExistingPhoto, debug_useLocalServerResponse, debug_useLocationIndependentObjects } from '@src/stateStore';
     import { wait, ARMODES, debounce } from "@core/common";
     import { createModel, createPlaceholder, addAxes, createObject } from '@core/modelTemplates';
-    import { printQuat, calculateDistance, calculateRotation, getRelativeGlobalPosition, convertGeoPose2PoseMat, convertGeo2WebVec3, convertAugmentedCity2WebQuat } from '@core/locationTools';
+    import { printQuat, calculateDistance, calculateRotation, getRelativeGlobalPosition, 
+             convertGeoPose2PoseMat, convertGeo2WebVec3, convertGeo2WebQuat, convertAugmentedCity2WebQuat } from '@core/locationTools';
     import { fakeLocationResult, fakeLocationResult2, getColorForContentId } from '@core/devTools';
     import { initCameraCaptureScene, drawCameraCaptureScene, createImageFromTexture } from '@core/cameraCapture';
     import ArCloudOverlay from "@components/dom-overlays/ArCloudOverlay.svelte";
@@ -501,17 +502,19 @@
 
 
         /*// OLD AugmentedCity API
-        let globalImagePoseQuaternion = quat.fromValues(globalPose.quaternion[0], 
-                                                        globalPose.quaternion[1],
-                                                        globalPose.quaternion[2],
-                                                        globalPose.quaternion[3]);
+        let globalImagePoseQuaternion = quat.fromValues(globalImagePose.quaternion[0], 
+                                                        globalImagePose.quaternion[1],
+                                                        globalImagePose.quaternion[2],
+                                                        globalImagePose.quaternion[3]);
         */
         // NEW AugmentedCity API:
-        let globalImagePoseQuaternion = quat.fromValues(globalPose.quaternion.x, 
-                                                        globalPose.quaternion.y,
-                                                        globalPose.quaternion.z,
-                                                        globalPose.quaternion.w);
-
+        let globalImagePoseQuaternion = quat.fromValues(globalImagePose.quaternion.x,
+                                                        globalImagePose.quaternion.y,
+                                                        globalImagePose.quaternion.z,
+                                                        globalImagePose.quaternion.w);
+        globalImagePoseQuaternion = convertAugmentedCity2WebQuat(globalImagePoseQuaternion);
+        
+        
         printQuat("local camera orientation", localPose.transform.orientation.x, localPose.transform.orientation.y, localPose.transform.orientation.z, localPose.transform.orientation.w);
         printQuat("global camera orientation", globalImagePoseQuaternion[0], globalImagePoseQuaternion[1], globalImagePoseQuaternion[2], globalImagePoseQuaternion[3]); // DO NOT SWAP axes
 
