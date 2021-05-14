@@ -597,7 +597,7 @@
             */
             // NEW AugmentedCity API:
             let globalObjectPose = record.content.geopose;
-            let globalObjectPoseQuaternion = quat.fromValues(globalObjectPose.quaternion.x, 
+            let globalObjectPoseQuaternion = quat.fromValues(globalObjectPose.quaternion.x,
                                                              globalObjectPose.quaternion.y,
                                                              globalObjectPose.quaternion.z,
                                                              globalObjectPose.quaternion.w);
@@ -611,12 +611,15 @@
             
             if($debug_useLocationIndependentObjects) {
                 //HACK: line up objects a bit North from us along a line towards East.
-                globalObjectPoseQuaternion[0] = 0;
-                globalObjectPoseQuaternion[1] = 0;
-                globalObjectPoseQuaternion[2] = 0;
-                globalObjectPoseQuaternion[3] = 1;
-                globalObjectPose.latitude = globalPose.latitude + 0.0001;
-                globalObjectPose.longitude = globalPose.longitude + 0.0001 * (cnt);
+                
+                // optionally also overwrite object orientation
+                globalObjectPoseQuaternion = quat.fromValues(0, 0, 0, 1); // neutral orientation (X right, Y up, Z backward) 
+                //globalObjectPoseQuaternion = quat.fromValues(0, 0.7071, 0, 0.7071); // rotated 90 degrees around Y axis
+                //globalObjectPoseQuaternion = quat.fromValues(0, 0, 0.7071, 0.7071); // rotated 90 degrees around Z axis
+                //globalObjectPoseQuaternion = quat.fromValues(0.7071, 0, 0, 0.7071); // rotated 90 degrees around X axis
+                
+                globalObjectPose.latitude = globalPose.latitude + 0.00001;
+                globalObjectPose.longitude = globalPose.longitude + 0.00001 * (cnt);
                 globalObjectPose.altitude = globalPose.altitude;
                 globalObjectPose.ellipsoidHeight = globalPose.ellipsoidHeight;
             }
