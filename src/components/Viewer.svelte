@@ -476,14 +476,13 @@
         globalPose.quaternion[3]=1;
         */
 
-
-        console.log('local image pose:');
         let localImagePoseMat4 = localPose.transform.matrix;
-        console.log(localImagePoseMat4);
-
-        console.log('global image GeoPose:');
         let globalImagePose = globalPose;
-        console.log(globalImagePose);
+        //console.log('local image pose:');
+        //console.log(localImagePoseMat4);
+        //console.log('global image GeoPose:');
+        //console.log(globalImagePose);
+
         /*
         console.log('global image pose:');
         let globalImagePoseMat4 = convertGeoPose2PoseMat(globalPose);
@@ -587,7 +586,7 @@
             // Augmented City special path for the GeoPose. Should be just 'record.content.geopose'
             let objectPose = record.content.geopose.pose;
 
-            console.log("global object GeoPose:");
+            
             /*// OLD AugmentedCity API
             let globalObjectPose = record.content.geopose.pose;
             let globalObjectPoseQuaternion = quat.fromValues(globalObjectPose.quaternion[0], 
@@ -601,12 +600,13 @@
                                                              globalObjectPose.quaternion.y,
                                                              globalObjectPose.quaternion.z,
                                                              globalObjectPose.quaternion.w);
-          
-            console.log(globalObjectPose);
+            //console.log("global object GeoPose:");
+            //console.log(globalObjectPose);
 
-            console.log("global object pose:");
+            
             let globalObjectPoseMat4 = convertGeoPose2PoseMat(globalObjectPose);
-            console.log(globalObjectPoseMat4);
+            //console.log("global object pose:");
+            //console.log(globalObjectPoseMat4);
 
             
             if($debug_useLocationIndependentObjects) {
@@ -768,7 +768,7 @@
 */
                 //////////////////
 
-                console.log("placeholder " + record.content.id + "\n" +
+                console.log("placeholder " + record.content.id + " " + record.content.title + "\n" +
                         "  position (" + placeholder.getPosition().x + ", " + placeholder.getPosition().y + ", " +  placeholder.getPosition().z + ") \n" +
                         "  orientation (" + placeholder.getEulerAngles().x +  ", " + placeholder.getEulerAngles().y + ", " +  placeholder.getEulerAngles().z + ")");
             }
@@ -780,7 +780,7 @@
 
         // rotate around the origin by the rotation that brings the SLAM system to the Geo system
         let QCur = geo2ArTransformNode.getRotation(); // Quat
-        printQuat("QCur", QCur.x, QCur.y, QCur.z, QCur.w);
+        //printQuat("QCur", QCur.x, QCur.y, QCur.z, QCur.w);
         let qCur = quat.fromValues(QCur.x, QCur.y, QCur.z, QCur.w);
         let qNew = quat.create();
 
@@ -798,7 +798,7 @@
                                       localPose.transform.position.z);
 
         console.log("geo2ArTransformNode:");
-        printQuat("  rotation:", geo2ArTransformNode.getRotation().x, geo2ArTransformNode.getRotation().y, geo2ArTransformNode.getRotation().z, geo2ArTransformNode.getRotation().w);
+        printQuat("  geo2ArTransformNode", geo2ArTransformNode.getRotation().x, geo2ArTransformNode.getRotation().y, geo2ArTransformNode.getRotation().z, geo2ArTransformNode.getRotation().w);
         console.log("  position: ", geo2ArTransformNode.getPosition().x, geo2ArTransformNode.getPosition().y, geo2ArTransformNode.getPosition().z);
     }
 </script>

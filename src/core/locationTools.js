@@ -30,17 +30,17 @@ export function printGlmQuat(name, qquat) {
 
     let euler = vec3.create();
     getEuler(euler, qquat);
-    console.log("  MV Euler angles (rad): " +  vec3.str(euler));
+    //console.log("  MV Euler angles (rad): " +  vec3.str(euler));
     console.log("  MV Euler angles: " +  toDegrees(euler[0]) + ", "+  toDegrees(euler[1]) + ", "+  toDegrees(euler[2]));
 
     // With PlayCanvas Quat
     let qQuat = new pc.Quat(qquat[0], qquat[1], qquat[2], qquat[3]);
     let qEuler = new pc.Vec3();
     qQuat.getEulerAngles(qEuler);
-    console.log("  PlayCanvas Euler angles: " + qEuler.toString());
+    console.log("  PC Euler angles: " + qEuler.toString());
     let pcAxis = new pc.Vec3()
     let pcAngle = qQuat.getAxisAngle(pcAxis);
-    console.log("  PlayCanvas axis: " + pcAxis.toString() + ", angle (deg): " + pcAngle);
+    //console.log("  PC axis: " + pcAxis.toString() + ", angle (deg): " + pcAngle);
 }
 export function printQuat(name, x, y, z, w) {
     // With gl-matrix quat
